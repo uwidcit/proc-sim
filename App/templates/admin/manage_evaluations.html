@@ -1,0 +1,620 @@
+{% extends "admin/layout.html" %}
+{% block title %}Manage Evaluations{% endblock %}
+{% block pane_width %}is-split{% endblock %}
+{% block content %}
+<div class="workspace-split is-ratio-2-1">
+  <div class="workspace-main">
+    <div class="toolbar">
+      <button type="button" class="btn btn-secondary filter-btn is-active" data-filter="all">All</button>
+      {% for client in client_filters %}
+      <button
+        type="button"
+        class="btn btn-secondary filter-btn"
+        data-filter="{{ client.id }}"
+      >{{ client.name }} ({{ client.count }})</button>
+      {% endfor %}
+      <span style="flex:1"></span>
+      <span style="font-size:0.8rem; color:var(--ink-muted);">
+        <strong style="color:var(--ink);" id="evalVisibleCount">{{ evaluation_groups|length }}</strong> shown
+        · <strong style="color:var(--ink);">{{ evaluation_groups|length }}</strong> selected
+        · <strong style="color:var(--ink);">{{ client_filters|length }}</strong> clients
+      </span>
+      <input
+        class="field"
+        type="search"
+        id="evalSearch"
+        placeholder="Search client, vendor, lot…"
+        style="max-width:14rem; padding:0.45rem 0.7rem;"
+      />
+    </div>
+
+    {% if evaluation_groups %}
+    <div class="panel-grid" id="evalGrid">
+      {% for evaluation in evaluation_groups %}
+      <button
+        type="button"
+        class="panel-card eval-card"
+        data-eval-id="{{ evaluation.id }}"
+        data-client-id="{{ evaluation.client_id }}"
+        data-client-name="{{ evaluation.name|e }}"
+        data-vendor-name="{{ evaluation.to_group_name|e }}"
+        data-lot-id="{{ evaluation.lotID }}"
+        data-lab-type="{{ evaluation.labType|e }}"
+        data-timestamp="{{ evaluation.timestamp|e }}"
+        data-specs="{{ evaluation.specsMet }}"
+        data-professionalism="{{ evaluation.professionalism }}"
+        data-presentation="{{ evaluation.presentation }}"
+        data-budget="{{ evaluation.budgetScore }}"
+        data-overall="{{ evaluation.overall }}"
+      >
+        <span style="display:flex; align-items:start; justify-content:space-between; gap:0.5rem;">
+          <span class="panel-card-title">{{ evaluation.name }}</span>
+          <span class="badge badge-ok">{{ evaluation.overall }}/10</span>
+        </span>
+        <span class="panel-card-meta">Vendor {{ evaluation.to_group_name }}</span>
+        <span class="panel-card-meta" style="flex:0;">Lot {{ evaluation.lotID }} · {{ evaluation.labType }}</span>
+        <span class="panel-card-meta" style="flex:0;">{{ evaluation.timestamp }}</span>
+      </button>
+      {% endfor %}
+    </div>
+    <div id="evalEmptyFilter" class="surface" style="display:none; padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
+      No evaluations match this filter.
+    </div>
+    {% else %}
+    <div class="surface" style="padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
+      No selected evaluations yet for this academic year.
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="detail-sidenav" id="evalPreviewPanel">
+    <div class="detail-sidenav-header">
+      <h2 class="font-heading" style="margin:0; font-size:1rem;" id="previewTitle">Evaluation preview</h2>
+      <button type="button" class="btn btn-ghost" id="clearPreviewBtn" aria-label="Clear selection" style="display:none;">×</button>
+    </div>
+    <div class="detail-sidenav-body" id="previewEmpty">
+      <p class="detail-sidenav-empty">Select an evaluation card to review scores here.</p>
+    </div>
+    <div class="detail-sidenav-body" id="previewBody" style="display:none;">
+      <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.75rem;">
+        <span class="badge badge-ok" id="previewOverallBadge"></span>
+        <span class="badge badge-accent" id="previewLotBadge"></span>
+      </div>
+      <p style="margin:0 0 1rem; font-size:0.8rem; color:var(--ink-muted);" id="previewTimestamp"></p>
+      <dl class="preview-dl">
+        <div><dt>Client</dt><dd id="preview-client"></dd></div>
+        <div><dt>Vendor</dt><dd id="preview-vendor"></dd></div>
+        <div><dt>Lab type</dt><dd id="preview-lab"></dd></div>
+        <div><dt>Quotation</dt><dd id="preview-quotation"></dd></div>
+        <div><dt>Document</dt><dd id="preview-filename"></dd></div>
+        <div><dt>Bids on lot</dt><dd id="preview-lot-bids"></dd></div>
+        <div>
+          <dt>Specs met</dt>
+          <dd>
+            <span id="preview-specs-label"></span>
+            <div class="score-bar" aria-hidden="true"><span id="preview-specs-bar"></span></div>
+          </dd>
+        </div>
+        <div><dt>Professionalism</dt><dd id="preview-professionalism" class="score-stars"></dd></div>
+        <div><dt>Presentation</dt><dd id="preview-presentation" class="score-stars"></dd></div>
+        <div><dt>Budget</dt><dd id="preview-budget" class="score-stars"></dd></div>
+        <div><dt>Overall score</dt><dd id="preview-overall" style="font-weight:700; font-size:1.05rem;"></dd></div>
+      </dl>
+    </div>
+    <div class="detail-sidenav-footer" id="previewFooter" style="display:none;">
+      <button type="button" class="btn btn-danger" id="removeEvalBtn" style="margin-right:auto;">Remove</button>
+      <button type="button" class="btn btn-primary" id="compareBtn">Compare bid &amp; RFP</button>
+    </div>
+  </aside>
+</div>
+
+<div id="compareModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45); padding:1rem;">
+  <div class="surface" style="width:min(72rem, 100%); height:min(90vh, 100%); display:flex; flex-direction:column; overflow:hidden;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; padding:0.85rem 1rem; border-bottom:1px solid var(--line); flex-shrink:0;">
+      <div style="min-width:0;">
+        <h3 class="font-heading" style="margin:0; font-size:1.05rem;" id="compareTitle">Compare bid &amp; RFP</h3>
+        <p style="margin:0.2rem 0 0; font-size:0.8rem; color:var(--ink-muted);" id="compareSubtitle"></p>
+      </div>
+      <div class="compare-nav">
+        <button type="button" class="btn btn-secondary" id="comparePrevBtn" aria-label="Previous bid">←</button>
+        <span class="compare-nav-count" id="compareNavCount">1 of 1</span>
+        <button type="button" class="btn btn-secondary" id="compareNextBtn" aria-label="Next bid">→</button>
+        <button type="button" class="btn btn-ghost" id="closeCompareModal" aria-label="Close">×</button>
+      </div>
+    </div>
+    <div class="compare-split">
+      <section class="compare-pane">
+        <header class="compare-pane-header">
+          <span class="font-heading" style="font-weight:700; font-size:0.85rem;">RFP requirements</span>
+          <span class="badge badge-accent" id="compareRfpLot"></span>
+        </header>
+        <div class="compare-pane-body">
+          <dl class="preview-dl" id="compareRfpList"></dl>
+        </div>
+      </section>
+      <section class="compare-pane">
+        <header class="compare-pane-header">
+          <span class="font-heading" style="font-weight:700; font-size:0.85rem;">Bid document</span>
+          <span class="badge badge-ok" id="compareBidFile" style="max-width:12rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+        </header>
+        <iframe id="comparePdfFrame" title="Bid document" class="compare-pdf"></iframe>
+      </section>
+    </div>
+    <div class="compare-eval-footer">
+      <div class="compare-eval-meta">
+        <span class="badge badge-ok" id="compareOverallBadge"></span>
+        <span class="badge badge-accent" id="compareLotBadge"></span>
+        <span style="font-size:0.8rem; color:var(--ink-muted);" id="compareEvalMeta"></span>
+      </div>
+      <div class="compare-eval-scores">
+        <div>
+          <div class="compare-eval-label">Specs met</div>
+          <div id="compareSpecsLabel" style="font-weight:650; font-size:0.875rem;"></div>
+          <div class="score-bar" id="compareSpecsBarWrap" aria-hidden="true"><span id="compareSpecsBar"></span></div>
+        </div>
+        <div>
+          <div class="compare-eval-label">Professionalism</div>
+          <div id="compareProfessionalism" class="score-stars"></div>
+        </div>
+        <div>
+          <div class="compare-eval-label">Presentation</div>
+          <div id="comparePresentation" class="score-stars"></div>
+        </div>
+        <div>
+          <div class="compare-eval-label">Budget</div>
+          <div id="compareBudget" class="score-stars"></div>
+        </div>
+        <div>
+          <div class="compare-eval-label">Overall</div>
+          <div id="compareOverall" style="font-weight:700; font-size:1.05rem;"></div>
+        </div>
+        <div>
+          <div class="compare-eval-label">Quotation</div>
+          <div id="compareQuotation" style="font-weight:650; font-size:0.875rem;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="confirmEvalModal" style="display:none; position:fixed; inset:0; z-index:210; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="padding:1.25rem; max-width:24rem; width:calc(100% - 2rem);">
+    <h3 class="font-heading" style="margin:0 0 0.5rem; font-size:1.05rem;">Remove evaluation?</h3>
+    <p style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);">Moves this evaluation back to draft. It will leave the selected list.</p>
+    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary" id="cancelEvalConfirm">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirmEvalRemoveBtn">Remove</button>
+    </div>
+  </div>
+</div>
+
+<script id="evalCompareData" type="application/json">
+{{ evaluation_groups | tojson }}
+</script>
+
+<style>
+.score-bar {
+  margin-top: 0.35rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.score-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.score-bar.is-mid > span { background: var(--warn); }
+.score-bar.is-low > span { background: var(--danger); }
+.score-stars {
+  letter-spacing: 0.08em;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.score-stars .is-on { color: var(--accent); }
+.score-stars .is-off { color: var(--line-strong); }
+
+.compare-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.compare-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+.compare-pane:last-child {
+  border-right: none;
+}
+.compare-pane-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.compare-pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+}
+.compare-pdf {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: var(--paper);
+}
+.compare-spec.is-met dd {
+  color: var(--ok);
+}
+.compare-spec.is-miss dd {
+  color: var(--ink-muted);
+}
+.compare-eval-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.compare-eval-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+}
+.compare-eval-scores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.75rem 1rem;
+}
+.compare-eval-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 0.25rem;
+}
+.compare-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.compare-nav-count {
+  min-width: 5.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink-muted);
+}
+.compare-nav .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 900px) {
+  .compare-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(12rem, 40%) 1fr;
+  }
+  .compare-pane {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .compare-pane:last-child {
+    border-bottom: none;
+  }
+}
+</style>
+
+<script>
+(function () {
+  const cards = Array.from(document.querySelectorAll('.eval-card'));
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  const searchInput = document.getElementById('evalSearch');
+  const emptyFilter = document.getElementById('evalEmptyFilter');
+  const visibleCount = document.getElementById('evalVisibleCount');
+  const previewEmpty = document.getElementById('previewEmpty');
+  const previewBody = document.getElementById('previewBody');
+  const previewFooter = document.getElementById('previewFooter');
+  const clearPreviewBtn = document.getElementById('clearPreviewBtn');
+  const removeBtn = document.getElementById('removeEvalBtn');
+  const compareBtn = document.getElementById('compareBtn');
+  const compareModal = document.getElementById('compareModal');
+  const comparePdfFrame = document.getElementById('comparePdfFrame');
+  const comparePrevBtn = document.getElementById('comparePrevBtn');
+  const compareNextBtn = document.getElementById('compareNextBtn');
+  const compareNavCount = document.getElementById('compareNavCount');
+  const params = new URLSearchParams(window.location.search);
+  let activeFilter = params.get('client') || 'all';
+  let selectedCard = null;
+  let pendingForm = null;
+  let comparePeers = [];
+  let compareIndex = 0;
+
+  const evalList = JSON.parse(document.getElementById('evalCompareData').textContent || '[]');
+  const evalById = {};
+  evalList.forEach(function (item) {
+    evalById[String(item.id)] = item;
+  });
+
+  const RFP_FIELDS = [
+    ['deviceType', 'Device type'],
+    ['resolution', 'Screen / resolution'],
+    ['os', 'Operating system(s)'],
+    ['cpu', 'CPU'],
+    ['ram', 'Memory (RAM)'],
+    ['drive', 'Hard drive'],
+    ['gpu', 'Graphics'],
+    ['io', 'I/O ports'],
+    ['peripherals', 'Peripherals'],
+    ['features', 'Special features'],
+  ];
+
+  function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+  }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value || '—';
+  }
+
+  function formatMoney(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function renderStars(el, value) {
+    const n = Math.max(0, Math.min(5, Number(value) || 0));
+    let html = '';
+    for (let i = 1; i <= 5; i++) {
+      html += '<span class="' + (i <= n ? 'is-on' : 'is-off') + '">★</span>';
+    }
+    el.innerHTML = html;
+  }
+
+  function selectedEval() {
+    if (!selectedCard) return null;
+    return evalById[String(selectedCard.dataset.evalId)] || null;
+  }
+
+  function clearPreview() {
+    selectedCard = null;
+    cards.forEach(function (c) { c.classList.remove('is-selected'); });
+    previewEmpty.style.display = '';
+    previewBody.style.display = 'none';
+    previewFooter.style.display = 'none';
+    clearPreviewBtn.style.display = 'none';
+    document.getElementById('previewTitle').textContent = 'Evaluation preview';
+  }
+
+  function showPreview(card) {
+    selectedCard = card;
+    cards.forEach(function (c) { c.classList.toggle('is-selected', c === card); });
+    previewEmpty.style.display = 'none';
+    previewBody.style.display = '';
+    previewFooter.style.display = 'flex';
+    clearPreviewBtn.style.display = '';
+
+    const data = evalById[String(card.dataset.evalId)] || {};
+    const specs = Number(card.dataset.specs) || 0;
+    const overall = card.dataset.overall || '0';
+
+    document.getElementById('previewTitle').textContent = card.dataset.clientName || 'Evaluation preview';
+    document.getElementById('previewOverallBadge').textContent = overall + '/10';
+    document.getElementById('previewLotBadge').textContent = 'Lot ' + (card.dataset.lotId || '');
+    document.getElementById('previewTimestamp').textContent = card.dataset.timestamp || '';
+    setText('preview-client', card.dataset.clientName);
+    setText('preview-vendor', card.dataset.vendorName);
+    setText('preview-lab', card.dataset.labType);
+    setText('preview-quotation', formatMoney(data.bid_quotation));
+    setText('preview-filename', data.bid_filename);
+    const bidCount = data.lot_bid_count || (data.lot_peers && data.lot_peers.length) || 1;
+    setText('preview-lot-bids', bidCount + ' bid' + (bidCount === 1 ? '' : 's'));
+    setText('preview-specs-label', specs + '/10');
+    setText('preview-overall', overall + '/10');
+
+    const bar = document.getElementById('preview-specs-bar');
+    const barWrap = bar.parentElement;
+    bar.style.width = Math.max(0, Math.min(100, (specs / 10) * 100)) + '%';
+    barWrap.classList.toggle('is-mid', specs >= 5 && specs < 7);
+    barWrap.classList.toggle('is-low', specs < 5);
+
+    renderStars(document.getElementById('preview-professionalism'), card.dataset.professionalism);
+    renderStars(document.getElementById('preview-presentation'), card.dataset.presentation);
+    renderStars(document.getElementById('preview-budget'), card.dataset.budget);
+
+    compareBtn.disabled = !data.pdf_url;
+  }
+
+  function renderCompare() {
+    const data = comparePeers[compareIndex];
+    if (!data) return;
+
+    const total = comparePeers.length;
+    compareNavCount.textContent = (compareIndex + 1) + ' of ' + total + ' bid' + (total === 1 ? '' : 's');
+    comparePrevBtn.disabled = total <= 1;
+    compareNextBtn.disabled = total <= 1;
+
+    const met = new Set(data.specs_selected || []);
+    const selectedMark = data.status === 'selected' ? ' · selected' : '';
+    document.getElementById('compareTitle').textContent = 'Compare bid & RFP';
+    document.getElementById('compareSubtitle').textContent =
+      (data.name || 'Client') + ' · ' + (data.to_group_name || 'Vendor') +
+      ' · Lot ' + (data.lotID || '') + selectedMark;
+    document.getElementById('compareRfpLot').textContent = data.labType || ('Lot ' + data.lotID);
+    document.getElementById('compareBidFile').textContent = data.bid_filename || 'Bid PDF';
+
+    const list = document.getElementById('compareRfpList');
+    list.innerHTML = '';
+    RFP_FIELDS.forEach(function (pair) {
+      const key = pair[0];
+      const label = pair[1];
+      const value = (data.rfp && data.rfp[key]) || '—';
+      const row = document.createElement('div');
+      const isMet = met.has(key);
+      row.className = 'compare-spec ' + (isMet ? 'is-met' : 'is-miss');
+      row.innerHTML =
+        '<dt>' + label + (isMet ? ' · met' : '') + '</dt>' +
+        '<dd></dd>';
+      row.querySelector('dd').textContent = value;
+      list.appendChild(row);
+    });
+
+    const hasEval = !!data.has_evaluation;
+    const specs = Number(data.specsMet) || 0;
+    const overall = hasEval && data.overall != null ? data.overall : null;
+    document.getElementById('compareOverallBadge').textContent =
+      overall != null ? overall + '/10' : 'No eval';
+    document.getElementById('compareOverallBadge').className =
+      'badge ' + (data.status === 'selected' ? 'badge-ok' : 'badge-pending');
+    document.getElementById('compareLotBadge').textContent = 'Lot ' + (data.lotID || '');
+    document.getElementById('compareEvalMeta').textContent =
+      (data.to_group_name || 'Vendor') +
+      (data.timestamp ? ' · ' + data.timestamp : '') +
+      (data.bid_filename ? ' · ' + data.bid_filename : '');
+    document.getElementById('compareSpecsLabel').textContent = hasEval ? specs + '/10' : '—';
+    document.getElementById('compareOverall').textContent =
+      overall != null ? overall + '/10' : 'Not evaluated';
+    document.getElementById('compareQuotation').textContent = formatMoney(data.bid_quotation);
+
+    const bar = document.getElementById('compareSpecsBar');
+    const barWrap = document.getElementById('compareSpecsBarWrap');
+    bar.style.width = hasEval ? Math.max(0, Math.min(100, (specs / 10) * 100)) + '%' : '0%';
+    barWrap.classList.toggle('is-mid', hasEval && specs >= 5 && specs < 7);
+    barWrap.classList.toggle('is-low', hasEval && specs < 5);
+
+    renderStars(document.getElementById('compareProfessionalism'), hasEval ? data.professionalism : 0);
+    renderStars(document.getElementById('comparePresentation'), hasEval ? data.presentation : 0);
+    renderStars(document.getElementById('compareBudget'), hasEval ? data.budgetScore : 0);
+
+    comparePdfFrame.src = data.pdf_url || '';
+  }
+
+  function openCompare() {
+    const data = selectedEval();
+    if (!data) return;
+    comparePeers = (data.lot_peers && data.lot_peers.length) ? data.lot_peers : [data];
+    compareIndex = Number.isInteger(data.peer_index) ? data.peer_index : 0;
+    if (compareIndex < 0 || compareIndex >= comparePeers.length) compareIndex = 0;
+    renderCompare();
+    compareModal.style.display = 'flex';
+  }
+
+  function shiftCompare(delta) {
+    if (comparePeers.length <= 1) return;
+    compareIndex = (compareIndex + delta + comparePeers.length) % comparePeers.length;
+    renderCompare();
+  }
+
+  function closeCompare() {
+    comparePdfFrame.src = '';
+    compareModal.style.display = 'none';
+    comparePeers = [];
+    compareIndex = 0;
+  }
+
+  function applyFilters() {
+    const q = (searchInput?.value || '').trim().toLowerCase();
+    let shown = 0;
+    cards.forEach(function (card) {
+      const filterOk = activeFilter === 'all' || String(card.dataset.clientId) === String(activeFilter);
+      const hay = [
+        card.dataset.clientName,
+        card.dataset.vendorName,
+        card.dataset.labType,
+        card.dataset.lotId,
+      ].join(' ').toLowerCase();
+      const searchOk = !q || hay.indexOf(q) !== -1;
+      const match = filterOk && searchOk;
+      card.style.display = match ? '' : 'none';
+      if (match) shown += 1;
+      if (!match && card === selectedCard) clearPreview();
+    });
+    if (visibleCount) visibleCount.textContent = String(shown);
+    if (emptyFilter) emptyFilter.style.display = cards.length && shown === 0 ? '' : 'none';
+  }
+
+  filterBtns.forEach(function (btn) {
+    btn.classList.toggle('is-active', String(btn.dataset.filter) === String(activeFilter));
+    btn.addEventListener('click', function () {
+      activeFilter = btn.dataset.filter;
+      filterBtns.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      const url = new URL(window.location.href);
+      if (activeFilter === 'all') url.searchParams.delete('client');
+      else url.searchParams.set('client', activeFilter);
+      window.history.replaceState({}, '', url);
+      applyFilters();
+    });
+  });
+
+  searchInput?.addEventListener('input', applyFilters);
+
+  cards.forEach(function (card) {
+    card.addEventListener('click', function () {
+      showPreview(card);
+    });
+  });
+
+  clearPreviewBtn?.addEventListener('click', clearPreview);
+  compareBtn?.addEventListener('click', openCompare);
+  comparePrevBtn?.addEventListener('click', function () { shiftCompare(-1); });
+  compareNextBtn?.addEventListener('click', function () { shiftCompare(1); });
+  document.getElementById('closeCompareModal').addEventListener('click', closeCompare);
+  compareModal.addEventListener('click', function (e) {
+    if (e.target === compareModal) closeCompare();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (compareModal.style.display !== 'flex') return;
+    if (e.key === 'ArrowLeft') shiftCompare(-1);
+    if (e.key === 'ArrowRight') shiftCompare(1);
+    if (e.key === 'Escape') closeCompare();
+  });
+
+  function hideConfirm() {
+    pendingForm = null;
+    document.getElementById('confirmEvalModal').style.display = 'none';
+  }
+
+  document.getElementById('cancelEvalConfirm').addEventListener('click', hideConfirm);
+  document.getElementById('confirmEvalRemoveBtn').addEventListener('click', function () {
+    if (pendingForm) {
+      document.body.appendChild(pendingForm);
+      pendingForm.submit();
+    }
+  });
+
+  removeBtn?.addEventListener('click', function () {
+    if (!selectedCard) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/manage-evaluations/' + selectedCard.dataset.evalId + '/remove';
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrf_token';
+    csrf.value = csrfToken();
+    form.appendChild(csrf);
+    pendingForm = form;
+    document.getElementById('confirmEvalModal').style.display = 'flex';
+  });
+
+  applyFilters();
+})();
+</script>
+{% endblock %}

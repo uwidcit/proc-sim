@@ -1,0 +1,27 @@
+{% extends "admin/layout.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <span style="font-size:0.875rem; color:var(--ink-muted);">
+    Free lots for auto-assign: <strong style="color:var(--ink);">{{ free_lots }}</strong>
+  </span>
+</div>
+
+<div class="surface" style="padding:1.25rem; max-width:28rem;">
+  <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.35rem;">Group size range</h2>
+  <p style="margin:0 0 1rem; font-size:0.8rem; color:var(--ink-muted);">Applies to student create-group and CSV imports (including the creator).</p>
+  <form method="POST" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Minimum
+      <input class="field" style="margin-top:0.35rem;" id="group_size_min" name="group_size_min" type="number" min="1" value="{{ settings.group_size_min }}" />
+    </label>
+    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Maximum
+      <input class="field" style="margin-top:0.35rem;" id="group_size_max" name="group_size_max" type="number" min="1" value="{{ settings.group_size_max }}" />
+    </label>
+    <div style="grid-column:1/-1;">
+      <button type="submit" class="btn btn-primary">Save settings</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

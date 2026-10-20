@@ -1,0 +1,107 @@
+{% extends "student/layout.html" %}
+{% block pane_width %}is-wide{% endblock %}
+{% block content %}
+<div class="tabs" role="tablist">
+  {% for lot in lots %}
+  <button
+    type="button"
+    role="tab"
+    class="tab {% if request.args.get('selected_lot', lots[0].id|string) == lot.id|string %}is-active{% endif %}"
+    onclick="window.location.href='?selected_lot={{ lot.id }}'"
+  >
+    Lot {{ lot.id }}
+  </button>
+  {% endfor %}
+</div>
+
+<div class="toolbar lot-toolbar">
+  <div style="min-width:0; flex:1 1 12rem;">
+    <div class="font-heading" style="font-weight:700;">{{ current_lot.labType }}</div>
+    <div style="font-size:0.8rem; color:var(--ink-muted);">
+      {{ current_lot.labSize }} · {{ current_lot.numMachines }} machines
+      {% if current_lot.labTypeObj %} · {{ current_lot.labTypeObj.description }}{% endif %}
+    </div>
+  </div>
+  <div class="lot-toolbar-meta">
+    <div style="text-align:right;">
+      <div style="font-size:0.7rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--ink-muted);">Budget ({{ currency_code }})</div>
+      <div style="font-weight:700;">{{ current_lot.budget|money }}</div>
+    </div>
+    {% if existing_rfp %}
+    <span class="badge {% if existing_rfp.status == 'submitted' %}badge-ok{% else %}badge-pending{% endif %}">{{ existing_rfp.status }}</span>
+    {% endif %}
+  </div>
+</div>
+<style>
+.lot-toolbar-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+@media (max-width: 700px) {
+  .lot-toolbar-meta { width: 100%; justify-content: space-between; }
+  .lot-toolbar-meta > div { text-align: left !important; }
+}
+</style>
+
+{% set is_locked = existing_rfp and existing_rfp.status == 'submitted' %}
+
+<form action="{{ url_for('student_views.student_lots_page') }}" method="POST" class="surface" style="padding:1rem;">
+  <input type="hidden" name="lot_id" value="{{ current_lot.id }}" />
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr)); gap:0.75rem;">
+    <label style="grid-column:1/-1; font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Device type
+      <textarea class="field" style="margin-top:0.35rem;" name="deviceType" rows="2" {% if is_locked %}readonly{% endif %}>{{ current_lot.deviceType if current_lot else '' }}</textarea>
+    </label>
+    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      CPU
+      <input class="field" style="margin-top:0.35rem;" type="text" name="cpu" value="{{ current_lot.cpu if current_lot else '' }}" {% if is_locked %}readonly{% endif %} />
+    </label>
+    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Memory (RAM)
+      <input class="field" style="margin-top:0.35rem;" type="text" name="ram" value="{{ current_lot.ram if current_lot else '' }}" {% if is_locked %}readonly{% endif %} />
+    </label>
+    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Screen / resolution
+      <input class="field" style="margin-top:0.35rem;" type="text" name="screen" value="{{ current_lot.resolution if current_lot else '' }}" {% if is_locked %}readonly{% endif %} />
+    </label>
+    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Operating system(s)
+      <input class="field" style="margin-top:0.35rem;" type="text" name="os" value="{{ current_lot.os if current_lot else '' }}" {% if is_locked %}readonly{% endif %} />
+    </label>
+    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Storage
+      <input class="field" style="margin-top:0.35rem;" type="text" name="storage" value="{{ current_lot.drive if current_lot else '' }}" {% if is_locked %}readonly{% endif %} />
+    </label>
+    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Graphics
+      <input class="field" style="margin-top:0.35rem;" type="text" name="graphics" value="{{ current_lot.gpu if current_lot else '' }}" {% if is_locked %}readonly{% endif %} />
+    </label>
+    <label style="grid-column:1/-1; font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      I/O
+      <textarea class="field" style="margin-top:0.35rem;" name="io" rows="2" {% if is_locked %}readonly{% endif %}>{{ current_lot.io if current_lot else '' }}</textarea>
+    </label>
+    <label style="grid-column:1/-1; font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Peripherals
+      <textarea class="field" style="margin-top:0.35rem;" name="peripherals" rows="2" {% if is_locked %}readonly{% endif %}>{{ current_lot.peripherals if current_lot else '' }}</textarea>
+    </label>
+    <label style="grid-column:1/-1; font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+      Features
+      <textarea class="field" style="margin-top:0.35rem;" name="features" rows="2" {% if is_locked %}readonly{% endif %}>{{ current_lot.features if current_lot else '' }}</textarea>
+    </label>
+  </div>
+
+  <div style="margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--line);">
+    {% if is_locked %}
+    <div class="badge badge-ok" style="padding:0.5rem 0.75rem;">Submitted — locked in the vendor gallery</div>
+    {% else %}
+    <div class="btn-row-mobile" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+      <button type="submit" name="action" value="save" class="btn btn-secondary">Save draft</button>
+      <button type="submit" name="action" value="submit" class="btn btn-primary">Submit final RFP</button>
+    </div>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

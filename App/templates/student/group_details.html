@@ -1,0 +1,36 @@
+{% extends "student/layout.html" %}
+{% block title %}Group Details{% endblock %}
+{% block content %}
+<div class="surface" style="padding:1.25rem; max-width:36rem; width:100%;">
+  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem 0.75rem; margin-bottom:1rem;">
+    <h2 class="font-heading" style="margin:0; font-size:1.25rem;">{{ group.groupName }}</h2>
+    {% if status == "Confirmed" %}
+    <span class="badge badge-ok">{{ status }}</span>
+    {% else %}
+    <span class="badge badge-pending">{{ status }}</span>
+    {% endif %}
+  </div>
+
+  {% if status != "Confirmed" %}
+  <p style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);">
+    Waiting for admin approval. Once approved, your group receives two exclusive lab lots.
+  </p>
+  {% endif %}
+
+  <h3 style="margin:0 0 0.5rem; font-size:0.8rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--ink-muted);">Members</h3>
+  <ul style="margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:0.35rem;">
+    {% for member in members %}
+    <li style="padding:0.55rem 0.75rem; background:var(--paper); border-radius:var(--radius); font-size:0.875rem;">
+      {{ member.name }} <span style="color:var(--ink-muted);">({{ member.username }})</span>
+    </li>
+    {% endfor %}
+  </ul>
+
+  {% if status == "Confirmed" %}
+  <div class="btn-row-mobile" style="margin-top:1.25rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
+    <a class="btn btn-primary" href="{{ url_for('student_views.student_lots_page') }}">Work on lots</a>
+    <a class="btn btn-secondary" href="{{ url_for('student_views.rfp_gallery_page') }}">Browse RFP gallery</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

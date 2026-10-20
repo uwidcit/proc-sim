@@ -1,0 +1,210 @@
+{% extends "student/layout.html" %}
+{% block pane_width %}is-wide{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <div style="min-width:0;">
+    <div class="font-heading" style="font-weight:700;">My submitted bids</div>
+    <div style="font-size:0.8rem; color:var(--ink-muted);">Track proposals sent to clients.</div>
+  </div>
+  <span style="flex:1"></span>
+  <span style="font-size:0.8rem; color:var(--ink-muted);">
+    <strong style="color:var(--ink);">{{ bids|length }}</strong> total
+  </span>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-strip-item is-ok">
+    <span class="stat-strip-value">{{ accepted }}</span>
+    <span>Accepted</span>
+  </div>
+  <div class="stat-strip-item is-pending">
+    <span class="stat-strip-value">{{ pending }}</span>
+    <span>Pending</span>
+  </div>
+  <div class="stat-strip-item is-danger">
+    <span class="stat-strip-value">{{ rejected }}</span>
+    <span>Rejected</span>
+  </div>
+</div>
+
+{% if bids %}
+<div class="surface table-scroll hide-mobile">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Submitted</th>
+        <th>RFP / lot</th>
+        <th>Client</th>
+        <th class="is-center">Status</th>
+        <th class="is-center">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for bid in bids %}
+      <tr>
+        <td>
+          <span style="font-weight:650;">{{ bid.submitted_at.strftime('%b %d, %Y') }}</span>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:0.15rem;">
+            {{ bid.submitted_at.strftime('%I:%M %p') }}
+          </div>
+        </td>
+        <td>
+          <span class="font-heading" style="font-weight:700;">{{ bid.rfp_title }}</span>
+        </td>
+        <td style="color:var(--ink-muted);">{{ bid.target_group }}</td>
+        <td class="is-center">
+          {% if bid.status == 'Accepted' %}
+          <span class="badge badge-ok">Accepted</span>
+          {% elif bid.status == 'Rejected' %}
+          <span class="badge badge-danger">Rejected</span>
+          {% else %}
+          <span class="badge badge-pending">Pending</span>
+          {% endif %}
+        </td>
+        <td class="is-center">
+          <button
+            type="button"
+            class="btn btn-secondary view-bid-btn"
+            data-bid-id="{{ bid.bid_id }}"
+            data-title="{{ bid.rfp_title|e }} · {{ bid.target_group|e }}"
+          >View details</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="mobile-card-list hide-desktop">
+  {% for bid in bids %}
+  <article class="mobile-card">
+    <div class="mobile-card-top">
+      <div class="mobile-card-title">{{ bid.rfp_title }}</div>
+      {% if bid.status == 'Accepted' %}
+      <span class="badge badge-ok">Accepted</span>
+      {% elif bid.status == 'Rejected' %}
+      <span class="badge badge-danger">Rejected</span>
+      {% else %}
+      <span class="badge badge-pending">Pending</span>
+      {% endif %}
+    </div>
+    <div class="mobile-card-meta">
+      {{ bid.target_group }} · {{ bid.submitted_at.strftime('%b %d, %Y') }} · {{ bid.submitted_at.strftime('%I:%M %p') }}
+    </div>
+    <div class="mobile-card-actions">
+      <button
+        type="button"
+        class="btn btn-primary view-bid-btn"
+        data-bid-id="{{ bid.bid_id }}"
+        data-title="{{ bid.rfp_title|e }} · {{ bid.target_group|e }}"
+      >View details</button>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="surface" style="padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
+  You have not submitted any bids yet.
+</div>
+{% endif %}
+
+<div id="bidDetailsModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45); padding:0.5rem;">
+  <div class="surface bid-modal-sheet">
+    <div class="bid-modal-header">
+      <button type="button" class="btn btn-ghost child-screen-back" id="closeBidModalBack" aria-label="Back">← Back</button>
+      <div style="min-width:0; flex:1;">
+        <h3 class="font-heading" style="margin:0; font-size:1.05rem;">Bid document</h3>
+        <p style="margin:0.2rem 0 0; font-size:0.8rem; color:var(--ink-muted);" id="bidModalSubtitle"></p>
+      </div>
+      <button type="button" class="btn btn-ghost desktop-only-close" id="closeBidModal" aria-label="Close">×</button>
+    </div>
+    <iframe id="bid-pdf-preview" title="Bid document" style="flex:1; min-height:0; width:100%; border:0; background:var(--paper);"></iframe>
+    <div class="bid-modal-footer">
+      <a id="bid-pdf-download" class="btn btn-primary" href="#" download>Download</a>
+      <button type="button" class="btn btn-secondary" id="closeBidModalFooter">Close</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.bid-modal-sheet {
+  width: min(78rem, 100%);
+  height: min(94vh, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.bid-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.bid-modal-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  #bidDetailsModal {
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+  .bid-modal-sheet {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+  }
+  .bid-modal-header .child-screen-back {
+    display: inline-flex;
+  }
+}
+</style>
+
+<script>
+(function () {
+  const modal = document.getElementById('bidDetailsModal');
+  const frame = document.getElementById('bid-pdf-preview');
+  const download = document.getElementById('bid-pdf-download');
+  const subtitle = document.getElementById('bidModalSubtitle');
+
+  function openModal(bidId, title) {
+    const url = '/student/bid-document/' + bidId;
+    frame.src = url;
+    download.href = url;
+    subtitle.textContent = title || '';
+    modal.style.display = 'flex';
+  }
+
+  function closeModal() {
+    frame.src = '';
+    modal.style.display = 'none';
+  }
+
+  document.querySelectorAll('.view-bid-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openModal(btn.dataset.bidId, btn.dataset.title);
+    });
+  });
+
+  document.getElementById('closeBidModal')?.addEventListener('click', closeModal);
+  document.getElementById('closeBidModalBack')?.addEventListener('click', closeModal);
+  document.getElementById('closeBidModalFooter').addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
+  });
+})();
+</script>
+{% endblock %}

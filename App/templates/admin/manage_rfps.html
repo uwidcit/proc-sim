@@ -1,0 +1,265 @@
+{% extends "admin/layout.html" %}
+{% block title %}Manage RFPs{% endblock %}
+{% block pane_width %}is-split{% endblock %}
+{% block content %}
+{% set all_rfps = rfp_requests + rfp_gallery %}
+<div class="workspace-split is-ratio-2-1">
+  <div class="workspace-main">
+    <div class="toolbar">
+      <button type="button" class="btn btn-secondary filter-btn is-active" data-filter="all">All</button>
+      <button type="button" class="btn btn-secondary filter-btn" data-filter="draft">Draft</button>
+      <button type="button" class="btn btn-secondary filter-btn" data-filter="submitted">Published</button>
+      <span style="flex:1"></span>
+      <span style="font-size:0.8rem; color:var(--ink-muted);">
+        <strong style="color:var(--ink);" id="rfpVisibleCount">{{ all_rfps|length }}</strong> shown
+        · <strong style="color:var(--ink);">{{ rfp_requests|length }}</strong> draft
+        · <strong style="color:var(--ink);">{{ rfp_gallery|length }}</strong> published
+      </span>
+      <input
+        class="field"
+        type="search"
+        id="rfpSearch"
+        placeholder="Search group or lot…"
+        style="max-width:14rem; padding:0.45rem 0.7rem;"
+      />
+    </div>
+
+    {% if all_rfps %}
+    <div class="panel-grid" id="rfpGrid">
+      {% for rfp in all_rfps %}
+      <button
+        type="button"
+        class="panel-card rfp-card"
+        data-status="{{ rfp.status }}"
+        data-name="{{ rfp.name|e }}"
+        data-lot="{{ rfp.Lot|e }}"
+        data-lot-id="{{ rfp.lotID }}"
+        data-group-id="{{ rfp.groupID }}"
+        data-timestamp="{{ rfp.timestamp|e }}"
+        data-devicetype="{{ rfp.deviceType|e }}"
+        data-resolution="{{ rfp.resolution|e }}"
+        data-os="{{ rfp.os|e }}"
+        data-cpu="{{ rfp.cpu|e }}"
+        data-ram="{{ rfp.ram|e }}"
+        data-drive="{{ rfp.drive|e }}"
+        data-gpu="{{ rfp.gpu|e }}"
+        data-io="{{ rfp.io|e }}"
+        data-peripherals="{{ rfp.peripherals|e }}"
+        data-features="{{ rfp.features|e }}"
+      >
+        <span style="display:flex; align-items:start; justify-content:space-between; gap:0.5rem;">
+          <span class="panel-card-title">{{ rfp.name }}</span>
+          {% if rfp.status == 'draft' %}
+          <span class="badge badge-pending">Draft</span>
+          {% else %}
+          <span class="badge badge-ok">Published</span>
+          {% endif %}
+        </span>
+        <span class="panel-card-meta">Lot {{ rfp.lotID }} · {{ rfp.Lot }}</span>
+        <span class="panel-card-meta" style="flex:0;">{{ rfp.timestamp }}</span>
+      </button>
+      {% endfor %}
+    </div>
+    <div id="rfpEmptyFilter" class="surface" style="display:none; padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
+      No RFPs match this filter.
+    </div>
+    {% else %}
+    <div class="surface" style="padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
+      No RFPs yet for this academic year.
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="detail-sidenav" id="rfpPreviewPanel">
+    <div class="detail-sidenav-header">
+      <h2 class="font-heading" style="margin:0; font-size:1rem;" id="previewTitle">RFP preview</h2>
+      <button type="button" class="btn btn-ghost" id="clearPreviewBtn" aria-label="Clear selection" style="display:none;">×</button>
+    </div>
+    <div class="detail-sidenav-body" id="previewEmpty">
+      <p class="detail-sidenav-empty">Select an RFP card to preview its specifications here.</p>
+    </div>
+    <div class="detail-sidenav-body" id="previewBody" style="display:none;">
+      <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:1rem;">
+        <span class="badge" id="previewStatusBadge"></span>
+        <span class="badge badge-accent" id="previewLotBadge"></span>
+      </div>
+      <p style="margin:0 0 1rem; font-size:0.8rem; color:var(--ink-muted);" id="previewTimestamp"></p>
+      <dl class="preview-dl">
+        <div><dt>Lab type</dt><dd id="preview-lot"></dd></div>
+        <div><dt>Device type</dt><dd id="preview-type"></dd></div>
+        <div><dt>Screen / resolution</dt><dd id="preview-screen"></dd></div>
+        <div><dt>Operating system(s)</dt><dd id="preview-os"></dd></div>
+        <div><dt>CPU</dt><dd id="preview-cpu"></dd></div>
+        <div><dt>Memory (RAM)</dt><dd id="preview-ram"></dd></div>
+        <div><dt>Hard drive</dt><dd id="preview-drive"></dd></div>
+        <div><dt>Graphics</dt><dd id="preview-gpu"></dd></div>
+        <div><dt>I/O ports</dt><dd id="preview-io"></dd></div>
+        <div><dt>Peripherals</dt><dd id="preview-peripherals"></dd></div>
+        <div><dt>Special features</dt><dd id="preview-features"></dd></div>
+      </dl>
+    </div>
+    <div class="detail-sidenav-footer" id="previewFooter" style="display:none;">
+      <button type="button" class="btn btn-danger" id="removeRfpBtn" style="margin-right:auto;">Remove</button>
+    </div>
+  </aside>
+</div>
+
+<div id="confirmRfpModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="padding:1.25rem; max-width:24rem; width:calc(100% - 2rem);">
+    <h3 id="confirmRfpTitle" class="font-heading" style="margin:0 0 0.5rem; font-size:1.05rem;"></h3>
+    <p id="confirmRfpMessage" style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);"></p>
+    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary" id="cancelRfpConfirm">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirmRfpActionBtn">Remove</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const cards = Array.from(document.querySelectorAll('.rfp-card'));
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  const searchInput = document.getElementById('rfpSearch');
+  const emptyFilter = document.getElementById('rfpEmptyFilter');
+  const visibleCount = document.getElementById('rfpVisibleCount');
+  const previewEmpty = document.getElementById('previewEmpty');
+  const previewBody = document.getElementById('previewBody');
+  const previewFooter = document.getElementById('previewFooter');
+  const clearPreviewBtn = document.getElementById('clearPreviewBtn');
+  const removeBtn = document.getElementById('removeRfpBtn');
+  let activeFilter = 'all';
+  let selectedCard = null;
+  let pendingForm = null;
+
+  function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+  }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value || '—';
+  }
+
+  function clearPreview() {
+    selectedCard = null;
+    cards.forEach(function (c) { c.classList.remove('is-selected'); });
+    previewEmpty.style.display = '';
+    previewBody.style.display = 'none';
+    previewFooter.style.display = 'none';
+    clearPreviewBtn.style.display = 'none';
+    document.getElementById('previewTitle').textContent = 'RFP preview';
+  }
+
+  function showPreview(card) {
+    selectedCard = card;
+    cards.forEach(function (c) { c.classList.toggle('is-selected', c === card); });
+    previewEmpty.style.display = 'none';
+    previewBody.style.display = '';
+    previewFooter.style.display = 'flex';
+    clearPreviewBtn.style.display = '';
+
+    const isDraft = card.dataset.status === 'draft';
+    document.getElementById('previewTitle').textContent = card.dataset.name || 'RFP preview';
+    const statusBadge = document.getElementById('previewStatusBadge');
+    statusBadge.textContent = isDraft ? 'Draft' : 'Published';
+    statusBadge.className = 'badge ' + (isDraft ? 'badge-pending' : 'badge-ok');
+    document.getElementById('previewLotBadge').textContent = 'Lot ' + (card.dataset.lotId || '');
+    document.getElementById('previewTimestamp').textContent = card.dataset.timestamp || '';
+
+    setText('preview-lot', card.dataset.lot);
+    setText('preview-type', card.dataset.devicetype);
+    setText('preview-screen', card.dataset.resolution);
+    setText('preview-os', card.dataset.os);
+    setText('preview-cpu', card.dataset.cpu);
+    setText('preview-ram', card.dataset.ram);
+    setText('preview-drive', card.dataset.drive);
+    setText('preview-gpu', card.dataset.gpu);
+    setText('preview-io', card.dataset.io);
+    setText('preview-peripherals', card.dataset.peripherals);
+    setText('preview-features', card.dataset.features);
+
+    removeBtn.textContent = isDraft ? 'Remove draft' : 'Remove';
+  }
+
+  function applyFilters() {
+    const q = (searchInput?.value || '').trim().toLowerCase();
+    let shown = 0;
+    cards.forEach(function (card) {
+      const statusOk = activeFilter === 'all' || card.dataset.status === activeFilter;
+      const hay = [
+        card.dataset.name,
+        card.dataset.lot,
+        card.dataset.lotId,
+        card.dataset.devicetype,
+      ].join(' ').toLowerCase();
+      const searchOk = !q || hay.indexOf(q) !== -1;
+      const match = statusOk && searchOk;
+      card.style.display = match ? '' : 'none';
+      if (match) shown += 1;
+      if (!match && card === selectedCard) clearPreview();
+    });
+    if (visibleCount) visibleCount.textContent = String(shown);
+    if (emptyFilter) emptyFilter.style.display = cards.length && shown === 0 ? '' : 'none';
+  }
+
+  filterBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeFilter = btn.dataset.filter;
+      filterBtns.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      applyFilters();
+    });
+  });
+
+  searchInput?.addEventListener('input', applyFilters);
+
+  cards.forEach(function (card) {
+    card.addEventListener('click', function () {
+      showPreview(card);
+    });
+  });
+
+  clearPreviewBtn?.addEventListener('click', clearPreview);
+
+  function showConfirm(title, message, form) {
+    pendingForm = form;
+    document.getElementById('confirmRfpTitle').textContent = title;
+    document.getElementById('confirmRfpMessage').textContent = message;
+    const modal = document.getElementById('confirmRfpModal');
+    modal.style.display = 'flex';
+  }
+
+  function hideConfirm() {
+    pendingForm = null;
+    document.getElementById('confirmRfpModal').style.display = 'none';
+  }
+
+  document.getElementById('cancelRfpConfirm').addEventListener('click', hideConfirm);
+  document.getElementById('confirmRfpActionBtn').addEventListener('click', function () {
+    if (pendingForm) {
+      document.body.appendChild(pendingForm);
+      pendingForm.submit();
+    }
+  });
+
+  removeBtn?.addEventListener('click', function () {
+    if (!selectedCard) return;
+    const isDraft = selectedCard.dataset.status === 'draft';
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{{ url_for('admin_views.admin_manage_rfps') }}";
+    form.innerHTML =
+      '<input type="hidden" name="groupID" value="' + selectedCard.dataset.groupId + '">' +
+      '<input type="hidden" name="lotID" value="' + selectedCard.dataset.lotId + '">' +
+      '<input type="hidden" name="action" value="' + (isDraft ? 'reject' : 'remove') + '">' +
+      '<input type="hidden" name="csrf_token" value="' + csrfToken() + '">';
+    showConfirm(
+      isDraft ? 'Remove draft RFP?' : 'Remove RFP?',
+      isDraft
+        ? 'This permanently removes the draft RFP.'
+        : 'This permanently removes the published RFP from the gallery.',
+      form
+    );
+  });
+})();
+</script>
+{% endblock %}

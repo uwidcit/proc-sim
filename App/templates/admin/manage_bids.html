@@ -1,0 +1,280 @@
+{% extends "admin/layout.html" %}
+{% block title %}Manage Bids{% endblock %}
+{% block pane_width %}is-split{% endblock %}
+{% block content %}
+<div class="workspace-split is-ratio-2-1">
+  <div class="workspace-main">
+    <div class="toolbar">
+      <button type="button" class="btn btn-secondary filter-btn is-active" data-filter="all">All</button>
+      {% for vendor in vendor_filters %}
+      <button
+        type="button"
+        class="btn btn-secondary filter-btn"
+        data-filter="{{ vendor.id }}"
+      >{{ vendor.name }} ({{ vendor.count }})</button>
+      {% endfor %}
+      <span style="flex:1"></span>
+      <span style="font-size:0.8rem; color:var(--ink-muted);">
+        <strong style="color:var(--ink);" id="bidVisibleCount">{{ bids|length }}</strong> shown
+        · <strong style="color:var(--ink);">{{ bids|length }}</strong> bids
+        · <strong style="color:var(--ink);">{{ vendor_filters|length }}</strong> vendors
+      </span>
+      <input
+        class="field"
+        type="search"
+        id="bidSearch"
+        placeholder="Search vendor, client, lot…"
+        style="max-width:14rem; padding:0.45rem 0.7rem;"
+      />
+    </div>
+
+    {% if bids %}
+    <div class="panel-grid" id="bidGrid">
+      {% for bid in bids %}
+      <button
+        type="button"
+        class="panel-card bid-card"
+        data-bid-id="{{ bid.id }}"
+        data-source-id="{{ bid.source_group_id }}"
+        data-source-name="{{ bid.source_group_name|e }}"
+        data-to-name="{{ bid.to_group_name|e }}"
+        data-lot-id="{{ bid.to_lot_id }}"
+        data-lot-name="{{ bid.to_lot_name|e }}"
+        data-timestamp="{{ bid.timestamp|e }}"
+        data-filename="{{ bid.filename|e }}"
+        data-quotation="{{ bid.quotation }}"
+        data-pdf-url="{{ bid.pdf_url }}"
+      >
+        <span style="display:flex; align-items:start; justify-content:space-between; gap:0.5rem;">
+          <span class="panel-card-title">{{ bid.source_group_name }}</span>
+          <span class="badge badge-accent">Lot {{ bid.to_lot_id }}</span>
+        </span>
+        <span class="panel-card-meta">To {{ bid.to_group_name }} · {{ bid.to_lot_name }}</span>
+        <span class="panel-card-meta" style="flex:0;">{{ bid.timestamp }}</span>
+      </button>
+      {% endfor %}
+    </div>
+    <div id="bidEmptyFilter" class="surface" style="display:none; padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
+      No bids match this filter.
+    </div>
+    {% else %}
+    <div class="surface" style="padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
+      No bids yet for this academic year.
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="detail-sidenav" id="bidPreviewPanel">
+    <div class="detail-sidenav-header">
+      <h2 class="font-heading" style="margin:0; font-size:1rem;" id="previewTitle">Bid preview</h2>
+      <button type="button" class="btn btn-ghost" id="clearPreviewBtn" aria-label="Clear selection" style="display:none;">×</button>
+    </div>
+    <div class="detail-sidenav-body" id="previewEmpty">
+      <p class="detail-sidenav-empty">Select a bid card to view details here.</p>
+    </div>
+    <div class="detail-sidenav-body" id="previewBody" style="display:none;">
+      <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.75rem;">
+        <span class="badge badge-ok" id="previewVendorBadge"></span>
+        <span class="badge badge-accent" id="previewLotBadge"></span>
+      </div>
+      <dl class="preview-dl">
+        <div><dt>Vendor</dt><dd id="preview-source"></dd></div>
+        <div><dt>Client</dt><dd id="preview-to"></dd></div>
+        <div><dt>Lab type</dt><dd id="preview-lot"></dd></div>
+        <div><dt>Submitted</dt><dd id="preview-timestamp"></dd></div>
+        <div><dt>Document</dt><dd id="preview-filename"></dd></div>
+        <div><dt>Quotation</dt><dd id="preview-quotation"></dd></div>
+      </dl>
+    </div>
+    <div class="detail-sidenav-footer" id="previewFooter" style="display:none;">
+      <button type="button" class="btn btn-danger" id="removeBidBtn" style="margin-right:auto;">Remove</button>
+      <button type="button" class="btn btn-primary" id="viewPdfBtn">View document</button>
+    </div>
+  </aside>
+</div>
+
+<div id="pdfModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45); padding:1rem;">
+  <div class="surface" style="width:min(56rem, 100%); height:min(85vh, 100%); display:flex; flex-direction:column; overflow:hidden;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.85rem 1rem; border-bottom:1px solid var(--line); flex-shrink:0;">
+      <h3 class="font-heading" style="margin:0; font-size:1.05rem;" id="pdfModalTitle">Bid document</h3>
+      <button type="button" class="btn btn-ghost" id="closePdfModal" aria-label="Close">×</button>
+    </div>
+    <iframe id="pdfFrame" title="Bid document preview" style="flex:1; width:100%; border:0; background:var(--paper);"></iframe>
+  </div>
+</div>
+
+<div id="confirmBidModal" style="display:none; position:fixed; inset:0; z-index:210; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="padding:1.25rem; max-width:24rem; width:calc(100% - 2rem);">
+    <h3 class="font-heading" style="margin:0 0 0.5rem; font-size:1.05rem;">Remove bid?</h3>
+    <p style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);">Permanently removes this bid and its document.</p>
+    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary" id="cancelBidConfirm">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirmBidRemoveBtn">Remove</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const cards = Array.from(document.querySelectorAll('.bid-card'));
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  const searchInput = document.getElementById('bidSearch');
+  const emptyFilter = document.getElementById('bidEmptyFilter');
+  const visibleCount = document.getElementById('bidVisibleCount');
+  const previewEmpty = document.getElementById('previewEmpty');
+  const previewBody = document.getElementById('previewBody');
+  const previewFooter = document.getElementById('previewFooter');
+  const clearPreviewBtn = document.getElementById('clearPreviewBtn');
+  const removeBtn = document.getElementById('removeBidBtn');
+  const viewPdfBtn = document.getElementById('viewPdfBtn');
+  const pdfModal = document.getElementById('pdfModal');
+  const pdfFrame = document.getElementById('pdfFrame');
+  const params = new URLSearchParams(window.location.search);
+  let activeFilter = params.get('vendor') || 'all';
+  let selectedCard = null;
+  let pendingForm = null;
+
+  function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+  }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value || '—';
+  }
+
+  function formatMoney(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function openPdfModal(url, title) {
+    document.getElementById('pdfModalTitle').textContent = title || 'Bid document';
+    pdfFrame.src = url || '';
+    pdfModal.style.display = 'flex';
+  }
+
+  function closePdfModal() {
+    pdfFrame.src = '';
+    pdfModal.style.display = 'none';
+  }
+
+  function clearPreview() {
+    selectedCard = null;
+    cards.forEach(function (c) { c.classList.remove('is-selected'); });
+    previewEmpty.style.display = '';
+    previewBody.style.display = 'none';
+    previewFooter.style.display = 'none';
+    clearPreviewBtn.style.display = 'none';
+    document.getElementById('previewTitle').textContent = 'Bid preview';
+  }
+
+  function showPreview(card) {
+    selectedCard = card;
+    cards.forEach(function (c) { c.classList.toggle('is-selected', c === card); });
+    previewEmpty.style.display = 'none';
+    previewBody.style.display = '';
+    previewFooter.style.display = 'flex';
+    clearPreviewBtn.style.display = '';
+
+    document.getElementById('previewTitle').textContent = card.dataset.sourceName || 'Bid preview';
+    document.getElementById('previewVendorBadge').textContent = card.dataset.sourceName || 'Vendor';
+    document.getElementById('previewLotBadge').textContent = 'Lot ' + (card.dataset.lotId || '');
+    setText('preview-source', card.dataset.sourceName);
+    setText('preview-to', card.dataset.toName);
+    setText('preview-lot', card.dataset.lotName);
+    setText('preview-timestamp', card.dataset.timestamp);
+    setText('preview-filename', card.dataset.filename);
+    setText('preview-quotation', formatMoney(card.dataset.quotation));
+  }
+
+  function applyFilters() {
+    const q = (searchInput?.value || '').trim().toLowerCase();
+    let shown = 0;
+    cards.forEach(function (card) {
+      const filterOk = activeFilter === 'all' || String(card.dataset.sourceId) === String(activeFilter);
+      const hay = [
+        card.dataset.sourceName,
+        card.dataset.toName,
+        card.dataset.lotName,
+        card.dataset.lotId,
+        card.dataset.filename,
+      ].join(' ').toLowerCase();
+      const searchOk = !q || hay.indexOf(q) !== -1;
+      const match = filterOk && searchOk;
+      card.style.display = match ? '' : 'none';
+      if (match) shown += 1;
+      if (!match && card === selectedCard) clearPreview();
+    });
+    if (visibleCount) visibleCount.textContent = String(shown);
+    if (emptyFilter) emptyFilter.style.display = cards.length && shown === 0 ? '' : 'none';
+  }
+
+  filterBtns.forEach(function (btn) {
+    btn.classList.toggle('is-active', String(btn.dataset.filter) === String(activeFilter));
+    btn.addEventListener('click', function () {
+      activeFilter = btn.dataset.filter;
+      filterBtns.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      const url = new URL(window.location.href);
+      if (activeFilter === 'all') url.searchParams.delete('vendor');
+      else url.searchParams.set('vendor', activeFilter);
+      window.history.replaceState({}, '', url);
+      applyFilters();
+    });
+  });
+
+  searchInput?.addEventListener('input', applyFilters);
+
+  cards.forEach(function (card) {
+    card.addEventListener('click', function () {
+      showPreview(card);
+    });
+  });
+
+  clearPreviewBtn?.addEventListener('click', clearPreview);
+
+  viewPdfBtn?.addEventListener('click', function () {
+    if (!selectedCard) return;
+    openPdfModal(
+      selectedCard.dataset.pdfUrl,
+      selectedCard.dataset.filename || 'Bid document'
+    );
+  });
+
+  document.getElementById('closePdfModal').addEventListener('click', closePdfModal);
+  pdfModal.addEventListener('click', function (e) {
+    if (e.target === pdfModal) closePdfModal();
+  });
+
+  function hideConfirm() {
+    pendingForm = null;
+    document.getElementById('confirmBidModal').style.display = 'none';
+  }
+
+  document.getElementById('cancelBidConfirm').addEventListener('click', hideConfirm);
+  document.getElementById('confirmBidRemoveBtn').addEventListener('click', function () {
+    if (pendingForm) {
+      document.body.appendChild(pendingForm);
+      pendingForm.submit();
+    }
+  });
+
+  removeBtn?.addEventListener('click', function () {
+    if (!selectedCard) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/manage-bids/group/' + selectedCard.dataset.sourceId + '/bid/' + selectedCard.dataset.bidId + '/remove';
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrf_token';
+    csrf.value = csrfToken();
+    form.appendChild(csrf);
+    pendingForm = form;
+    document.getElementById('confirmBidModal').style.display = 'flex';
+  });
+
+  applyFilters();
+})();
+</script>
+{% endblock %}

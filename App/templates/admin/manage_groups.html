@@ -1,0 +1,176 @@
+{% extends "admin/layout.html" %}
+{% block title %}Manage Groups{% endblock %}
+{% block pane_width %}is-wide{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <span style="font-size:0.875rem; color:var(--ink-muted);">
+    <strong style="color:var(--ink);">{{ group_requests|length }}</strong> pending
+    · <strong style="color:var(--ink);">{{ groups|length }}</strong> confirmed
+    · <strong style="color:var(--ink);">{{ lots|length }}</strong> free lots
+  </span>
+  <span style="flex:1"></span>
+  <a class="btn btn-secondary" href="{{ url_for('admin_views.admin_import_groups') }}">Import CSV</a>
+</div>
+
+<section style="margin-bottom:1.5rem;">
+  <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.65rem;">Pending requests</h2>
+  <p style="margin:0 0 0.85rem; font-size:0.8rem; color:var(--ink-muted);">One-click approve auto-assigns the next 2 exclusive lots.</p>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); gap:0.75rem;">
+    {% if group_requests %}
+      {% for request in group_requests %}
+      <article class="surface" style="padding:1rem; display:flex; flex-direction:column; gap:0.85rem;">
+        <div style="display:flex; justify-content:space-between; gap:0.5rem; align-items:start;">
+          <div>
+            <div class="font-heading" style="font-weight:700;">{{ request.name }}</div>
+            <span class="badge badge-pending">Pending</span>
+          </div>
+        </div>
+        <ul style="margin:0; padding-left:1.1rem; font-size:0.8rem; color:var(--ink-muted);">
+          {% for member in request.members %}
+          <li>{{ member.name }} ({{ member.id }})</li>
+          {% endfor %}
+        </ul>
+        <div style="display:flex; flex-direction:column; gap:0.4rem; margin-top:auto;">
+          <button type="button" class="btn btn-primary approve-btn" data-group-id="{{ request.id }}">Approve (auto-assign)</button>
+          <button type="button" class="btn btn-danger decline-btn" data-group-id="{{ request.id }}">Reject</button>
+        </div>
+      </article>
+      {% endfor %}
+    {% else %}
+      <div class="surface" style="padding:1.25rem; grid-column:1/-1; color:var(--ink-muted); font-size:0.875rem;">No pending group requests.</div>
+    {% endif %}
+  </div>
+</section>
+
+<section>
+  <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.65rem;">Confirmed groups</h2>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); gap:0.75rem;">
+    {% if groups %}
+      {% for group in groups %}
+      <article class="surface" style="padding:1rem; display:flex; flex-direction:column; gap:0.85rem;">
+        <div>
+          <div class="font-heading" style="font-weight:700;">{{ group.name }}</div>
+        </div>
+        <ul style="margin:0; padding-left:1.1rem; font-size:0.8rem; color:var(--ink-muted);">
+          {% for member in group.members %}
+          <li>{{ member.name }} ({{ member.id }})</li>
+          {% endfor %}
+        </ul>
+        <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
+          {% for lot in group.lots %}
+          <span class="badge badge-accent">Lot {{ lot }}</span>
+          {% endfor %}
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-top:auto;">
+          <button type="button" class="btn btn-danger remove-btn" data-group-id="{{ group.id }}">Remove</button>
+          <label class="status-switch" title="Toggle pending / confirmed">
+            <span class="status-switch-label is-pending">Pending</span>
+            <input
+              type="checkbox"
+              class="status-switch-input reopen-toggle"
+              checked
+              data-group-id="{{ group.id }}"
+            />
+            <span class="status-switch-track" aria-hidden="true"></span>
+            <span class="status-switch-label is-confirmed">Confirmed</span>
+          </label>
+        </div>
+      </article>
+      {% endfor %}
+    {% else %}
+      <div class="surface" style="padding:1.25rem; grid-column:1/-1; color:var(--ink-muted); font-size:0.875rem;">No confirmed groups yet.</div>
+    {% endif %}
+  </div>
+</section>
+
+<div id="confirmModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="padding:1.25rem; max-width:24rem; width:calc(100% - 2rem);">
+    <h3 id="confirmTitle" class="font-heading" style="margin:0 0 0.5rem; font-size:1.05rem;"></h3>
+    <p id="confirmMessage" style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);"></p>
+    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary" onclick="hideConfirmModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" id="confirmActionBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let pendingForm = null;
+let pendingToggle = null;
+function showConfirmModal(title, message, form, toggle) {
+  pendingForm = form;
+  pendingToggle = toggle || null;
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMessage').textContent = message;
+  const modal = document.getElementById('confirmModal');
+  modal.style.display = 'flex';
+}
+function hideConfirmModal() {
+  if (pendingToggle) {
+    pendingToggle.checked = true;
+  }
+  pendingForm = null;
+  pendingToggle = null;
+  document.getElementById('confirmModal').style.display = 'none';
+}
+function csrfInput() {
+  const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const input = document.createElement('input');
+  input.type = 'hidden'; input.name = 'csrf_token'; input.value = token;
+  return input;
+}
+window.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.approve-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `/admin/group-requests/${e.target.dataset.groupId}/approve`;
+      form.appendChild(csrfInput());
+      showConfirmModal('Approve group?', 'Assigns the next 2 unassigned exclusive lots. Fails if fewer than 2 lots are free.', form);
+    });
+  });
+  document.querySelectorAll('.decline-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `/admin/group-requests/${e.target.dataset.groupId}/decline`;
+      form.appendChild(csrfInput());
+      showConfirmModal('Reject request?', 'This permanently rejects the group request.', form);
+    });
+  });
+  document.querySelectorAll('.reopen-toggle').forEach(function (toggle) {
+    toggle.addEventListener('change', function (e) {
+      if (e.target.checked) {
+        return;
+      }
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `/admin/groups/${e.target.dataset.groupId}/reopen`;
+      form.appendChild(csrfInput());
+      showConfirmModal(
+        'Mark pending?',
+        'Moves the group back to pending and releases its lots.',
+        form,
+        e.target
+      );
+    });
+  });
+  document.querySelectorAll('.remove-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `/admin/groups/${e.target.dataset.groupId}/remove`;
+      form.appendChild(csrfInput());
+      showConfirmModal('Remove group?', 'Permanently removes the group and related data.', form);
+    });
+  });
+  document.getElementById('confirmActionBtn').addEventListener('click', function () {
+    if (pendingForm) {
+      pendingToggle = null;
+      document.body.appendChild(pendingForm);
+      pendingForm.submit();
+    }
+  });
+});
+</script>
+{% endblock %}

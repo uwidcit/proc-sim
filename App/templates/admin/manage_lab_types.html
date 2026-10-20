@@ -1,0 +1,130 @@
+{% extends "admin/layout.html" %}
+{% block title %}Manage Lab Types{% endblock %}
+{% block pane_width %}is-wide{% endblock %}
+{% block content %}
+<form
+  method="POST"
+  action="{{ url_for('admin_views.admin_add_lab_type') }}"
+  class="surface"
+  style="padding:1rem; margin-bottom:1rem; display:grid; grid-template-columns:minmax(10rem,1fr) minmax(14rem,2fr) auto; gap:0.75rem; align-items:end;"
+>
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Name
+    <input class="field" style="margin-top:0.35rem;" type="text" name="name" placeholder="e.g. GIS Lab" required />
+  </label>
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Description
+    <input class="field" style="margin-top:0.35rem;" type="text" name="description" placeholder="e.g. Geospatial analysis workstations" required />
+  </label>
+  <button type="submit" class="btn btn-primary" style="min-height:2.55rem;">Add lab type</button>
+</form>
+
+{% if lab_types %}
+<div class="panel-grid" id="labTypeGrid">
+  {% for type in lab_types %}
+  <button
+    type="button"
+    class="panel-card lab-type-card"
+    data-type-id="{{ type.id }}"
+    data-type-name="{{ type.name }}"
+    data-type-description="{{ type.description }}"
+  >
+    <span class="panel-card-title">{{ type.name }}</span>
+    <span class="panel-card-meta">{{ type.description }}</span>
+  </button>
+  {% endfor %}
+</div>
+{% else %}
+<div class="surface" style="padding:1.25rem; color:var(--ink-muted);">
+  No lab types yet. Use the form above to create the first one.
+</div>
+{% endif %}
+
+<div id="labTypeModal" class="hidden" style="position:fixed; inset:0; z-index:200; display:none; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="width:min(26rem, calc(100% - 2rem)); display:flex; flex-direction:column; max-height:85vh;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:1rem 1.1rem; border-bottom:1px solid var(--line);">
+      <h2 id="labTypeModalTitle" class="font-heading" style="margin:0; font-size:1.1rem;">Edit lab type</h2>
+      <button type="button" class="btn btn-ghost close-labtype-modal" aria-label="Close">×</button>
+    </div>
+    <form id="labTypeForm" method="POST" style="padding:1rem 1.1rem; display:flex; flex-direction:column; gap:0.75rem; overflow:auto;">
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Name
+        <input class="field" style="margin-top:0.35rem;" type="text" name="name" id="labTypeName" required />
+      </label>
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Description
+        <textarea class="field" style="margin-top:0.35rem;" name="description" id="labTypeDescription" rows="4" required></textarea>
+      </label>
+    </form>
+    <div style="display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:flex-end; padding:0.85rem 1.1rem; border-top:1px solid var(--line);">
+      <button type="button" class="btn btn-danger" id="removeFromModal" style="margin-right:auto;">Remove</button>
+      <button type="button" class="btn btn-secondary close-labtype-modal">Cancel</button>
+      <button type="submit" form="labTypeForm" class="btn btn-primary" id="labTypeSubmitButton">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="removeLabTypeModal" class="hidden" style="position:fixed; inset:0; z-index:210; display:none; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="width:min(24rem, calc(100% - 2rem)); padding:1.25rem;">
+    <h3 class="font-heading" style="margin:0 0 0.5rem;">Remove lab type?</h3>
+    <p style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);">Lots using this type will keep their saved name.</p>
+    <form id="removeLabTypeForm" method="POST" style="display:flex; gap:0.5rem; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary" id="cancel-remove-labtype">Cancel</button>
+      <button type="submit" class="btn btn-danger">Remove</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  const form = document.getElementById('labTypeForm');
+  const nameInput = document.getElementById('labTypeName');
+  const descInput = document.getElementById('labTypeDescription');
+  let activeId = null;
+
+  function showModal(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('hidden');
+    el.style.display = 'flex';
+  }
+  function hideModal(id) {
+    const el = document.getElementById(id);
+    el.classList.add('hidden');
+    el.style.display = 'none';
+  }
+
+  document.querySelectorAll('.lab-type-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      activeId = card.dataset.typeId;
+      form.action = `/admin/lab-types/${activeId}/edit`;
+      nameInput.value = card.dataset.typeName || '';
+      descInput.value = card.dataset.typeDescription || '';
+      document.getElementById('removeLabTypeForm').action = `/admin/lab-types/${activeId}/remove`;
+      showModal('labTypeModal');
+      nameInput.focus();
+    });
+  });
+
+  document.querySelectorAll('.close-labtype-modal').forEach(function (btn) {
+    btn.addEventListener('click', function () { hideModal('labTypeModal'); });
+  });
+
+  document.getElementById('removeFromModal').addEventListener('click', function () {
+    if (!activeId) return;
+    showModal('removeLabTypeModal');
+  });
+
+  document.getElementById('cancel-remove-labtype').addEventListener('click', function () {
+    hideModal('removeLabTypeModal');
+  });
+})();
+</script>
+
+<style>
+@media (max-width: 700px) {
+  form.surface[action*="lab-types"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+</style>
+{% endblock %}

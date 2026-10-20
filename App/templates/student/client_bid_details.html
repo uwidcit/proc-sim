@@ -1,0 +1,363 @@
+{% extends "student/layout.html" %}
+{% block pane_width %}is-split{% endblock %}
+{% block content %}
+<div class="workspace-split is-ratio-2-1 is-child-screens bid-eval-workspace" id="bidEvalWorkspace">
+  <div class="workspace-main bid-eval-main">
+    <div class="bid-eval-toolbar">
+      <a class="btn btn-ghost" href="{{ url_for('student_views.student_view_bids_page', selected_lot=bid.lot_id) }}">← Back to Lot {{ bid.lot_id }} bids</a>
+      <span style="flex:1"></span>
+      {% if lot_bid_nav|length > 1 %}
+      <div class="bid-peer-nav">
+        <a
+          class="btn btn-secondary"
+          href="{{ url_for('student_views.student_bid_details_page', bid_id=prev_bid_id) }}"
+          aria-label="Previous bid"
+        >←</a>
+        <span class="bid-peer-count">
+          {{ peer_index + 1 }} of {{ lot_bid_nav|length }} bids
+        </span>
+        <a
+          class="btn btn-secondary"
+          href="{{ url_for('student_views.student_bid_details_page', bid_id=next_bid_id) }}"
+          aria-label="Next bid"
+        >→</a>
+      </div>
+      {% else %}
+      <span class="bid-peer-count">1 of 1 bid</span>
+      {% endif %}
+      <button type="button" class="btn btn-primary child-screen-open" id="openEvalScreen">Evaluate</button>
+    </div>
+
+    <div class="surface bid-doc-panel">
+      <div class="bid-doc-header">
+        <div style="min-width:0;">
+          <div class="font-heading" style="font-weight:700; font-size:0.85rem;">{{ bid.vendor_name }}</div>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:0.15rem;">Vendor proposal</div>
+        </div>
+        <span class="badge badge-accent" style="max-width:14rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ bid.filename }}</span>
+      </div>
+      <iframe
+        class="bid-doc-frame"
+        title="Bid document"
+        src="{{ url_for('student_views.serve_bid_document', bid_id=bid.bid_id) }}"
+      ></iframe>
+    </div>
+  </div>
+
+  <aside class="detail-sidenav bid-eval-side">
+    <form method="POST" class="bid-eval-form">
+      <input type="hidden" name="bid_id" value="{{ bid.bid_id }}" />
+      <input type="hidden" name="professionalism_stars" id="professionalism_stars" value="{{ existing.professionalism if existing else 0 }}" />
+      <input type="hidden" name="presentation_stars" id="presentation_stars" value="{{ existing.presentation if existing else 0 }}" />
+      <input type="hidden" name="budget_stars" id="budget_stars" value="{{ existing.budget if existing else 0 }}" />
+
+      <div class="detail-sidenav-header bid-eval-side-header">
+        <button type="button" class="btn btn-ghost child-screen-back" id="closeEvalScreen" aria-label="Back to document">← Document</button>
+        <h2 class="font-heading" style="margin:0; font-size:1rem;">Evaluation</h2>
+      </div>
+
+      <div class="detail-sidenav-body bid-eval-scroll">
+        {% set diff = lot.budget - bid.total_price %}
+        <section class="surface bid-eval-card">
+          <div class="font-heading" style="font-size:1.5rem; font-weight:700; letter-spacing:-0.02em;">
+            {{ bid.total_price|money }}
+          </div>
+          {% if diff >= 0 %}
+          <p class="bid-eval-budget is-under">Under budget by {{ diff|money }}</p>
+          {% else %}
+          <p class="bid-eval-budget is-over">Over budget by {{ (-diff)|money }}</p>
+          {% endif %}
+          <p class="bid-eval-budget-meta">Lot budget {{ lot.budget|money }}</p>
+        </section>
+
+        <section class="surface bid-eval-card">
+          <h3 class="bid-eval-section-title">Technical audit</h3>
+          <div class="bid-audit-list">
+            {% for key, label in technical_specs %}
+            {% set is_checked = existing and key in existing.specsSelected.split(',') %}
+            <label class="bid-audit-item">
+              <input type="checkbox" name="specs_selected" value="{{ key }}" {% if is_checked %}checked{% endif %} />
+              <span class="bid-audit-fields">
+                <span class="bid-audit-label">{{ label }}</span>
+                <input
+                  class="bid-audit-comment"
+                  type="text"
+                  name="comment_{{ key }}"
+                  value="{% if existing %}{{ existing[key] or '' }}{% endif %}"
+                  placeholder="Add comment…"
+                />
+              </span>
+            </label>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="surface bid-eval-card">
+          <h3 class="bid-eval-section-title">Vendor competency</h3>
+          <div class="bid-star-list">
+            {% for item in ['Professionalism', 'Presentation', 'Budget'] %}
+            <div class="bid-star-row">
+              <div class="bid-audit-label">{{ item }}</div>
+              <div class="bid-stars" data-category="{{ item | lower }}">
+                {% for i in range(1, 6) %}
+                <button type="button" class="star-btn" data-val="{{ i }}" aria-label="{{ i }} stars">★</button>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
+
+      <div class="detail-sidenav-footer">
+        <button type="submit" class="btn btn-primary" style="width:100%;">Save evaluation</button>
+      </div>
+    </form>
+  </aside>
+</div>
+
+<style>
+.bid-eval-workspace {
+  min-height: 0;
+}
+.bid-eval-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem 1.25rem !important;
+}
+.bid-eval-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.bid-peer-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.bid-peer-count {
+  min-width: 5.75rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink-muted);
+}
+.bid-doc-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.bid-doc-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.bid-doc-frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: var(--paper);
+}
+.bid-eval-side {
+  width: auto;
+}
+.bid-eval-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.bid-eval-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.bid-eval-card {
+  padding: 0.9rem 1rem;
+}
+.bid-eval-section-title {
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.bid-eval-budget {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.bid-eval-budget.is-under { color: var(--ok); }
+.bid-eval-budget.is-over { color: var(--danger); }
+.bid-eval-budget-meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+.bid-audit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.bid-audit-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.45rem 0.35rem;
+  border-radius: calc(var(--radius) - 0.1rem);
+  cursor: pointer;
+}
+.bid-audit-item:hover {
+  background: var(--paper);
+}
+.bid-audit-item input[type="checkbox"] {
+  margin-top: 0.2rem;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.bid-audit-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.bid-audit-label {
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.bid-audit-comment {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px dashed var(--line-strong);
+  background: transparent;
+  padding: 0.15rem 0 0.25rem;
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+.bid-audit-comment::placeholder {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+.bid-audit-comment:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+.bid-star-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.bid-star-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.bid-stars {
+  display: flex;
+  gap: 0.2rem;
+}
+.star-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--line-strong);
+  cursor: pointer;
+}
+.star-btn.is-on,
+.star-btn:hover {
+  color: var(--accent);
+}
+.bid-eval-side-header {
+  justify-content: flex-start;
+}
+.bid-eval-side-header .font-heading {
+  flex: 1;
+}
+@media (max-width: 900px) {
+  .bid-eval-main {
+    padding: 0.75rem 0.85rem 1rem !important;
+  }
+  .bid-doc-panel {
+    min-height: 0;
+  }
+  .bid-eval-side-header .font-heading {
+    text-align: center;
+  }
+}
+</style>
+
+<script>
+(function () {
+  const workspace = document.getElementById('bidEvalWorkspace');
+  const openBtn = document.getElementById('openEvalScreen');
+  const closeBtn = document.getElementById('closeEvalScreen');
+
+  function openEval() {
+    workspace?.classList.add('is-detail-open');
+    window.scrollTo(0, 0);
+  }
+  function closeEval() {
+    workspace?.classList.remove('is-detail-open');
+  }
+
+  openBtn?.addEventListener('click', openEval);
+  closeBtn?.addEventListener('click', closeEval);
+
+  document.querySelectorAll('.star-btn').forEach(function (star) {
+    star.addEventListener('click', function () {
+      const val = Number(this.dataset.val);
+      const container = this.parentElement;
+      const category = container.dataset.category;
+      container.querySelectorAll('.star-btn').forEach(function (s) {
+        s.classList.toggle('is-on', Number(s.dataset.val) <= val);
+      });
+      document.getElementById(category + '_stars').value = val;
+    });
+  });
+
+  function initStars(category, value) {
+    const container = document.querySelector('[data-category="' + category + '"]');
+    if (!container || !value) return;
+    container.querySelectorAll('.star-btn').forEach(function (s) {
+      s.classList.toggle('is-on', Number(s.dataset.val) <= Number(value));
+    });
+  }
+
+  initStars('professionalism', {{ existing.professionalism if existing else 0 }});
+  initStars('presentation', {{ existing.presentation if existing else 0 }});
+  initStars('budget', {{ existing.budget if existing else 0 }});
+
+  {% if lot_bid_nav|length > 1 %}
+  document.addEventListener('keydown', function (e) {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (e.key === 'ArrowLeft') {
+      window.location.href = "{{ url_for('student_views.student_bid_details_page', bid_id=prev_bid_id) }}";
+    }
+    if (e.key === 'ArrowRight') {
+      window.location.href = "{{ url_for('student_views.student_bid_details_page', bid_id=next_bid_id) }}";
+    }
+  });
+  {% endif %}
+})();
+</script>
+{% endblock %}

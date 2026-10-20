@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Procurement Simulator{% endblock %}</title>
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            heading: ["Sora", "sans-serif"],
+            body: ["Manrope", "sans-serif"],
+          },
+          colors: {
+            brand: {
+              50: "#f0fdfa", 100: "#ccfbf1", 200: "#99f6e4", 300: "#5eead4",
+              400: "#2dd4bf", 500: "#14b8a6", 600: "#0d9488", 700: "#0f766e",
+              800: "#115e59", 900: "#134e4a",
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}" />
+  <style>
+    .shell-pane .bg-slate-950, .shell-pane .bg-slate-900 { background: #fff !important; }
+    .shell-pane .border-slate-800, .shell-pane .border-slate-700 { border-color: var(--line) !important; }
+    .shell-pane .text-slate-100, .shell-pane .text-slate-200 { color: var(--ink) !important; }
+    .shell-pane .text-slate-300, .shell-pane .text-slate-400 { color: var(--ink-muted) !important; }
+    .shell-pane .hover\:bg-slate-800:hover, .shell-pane .hover\:bg-slate-700:hover { background: var(--paper) !important; }
+    .shell-pane .bg-slate-800 { background: var(--paper) !important; }
+    .shell-pane .bg-brand-900 { background: var(--accent-soft) !important; }
+    .shell-pane .text-brand-300, .shell-pane .text-brand-400 { color: var(--accent-ink) !important; }
+    .shell-pane .border-brand-800, .shell-pane .border-brand-700 { border-color: #99f6e4 !important; }
+    .shell-pane .bg-emerald-900 { background: var(--ok-soft) !important; }
+    .shell-pane .text-emerald-300 { color: var(--ok) !important; }
+    .shell-pane .bg-amber-900 { background: var(--warn-soft) !important; }
+    .shell-pane .text-amber-300 { color: var(--warn) !important; }
+  </style>
+</head>
+<body class="app-shell">
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+  <div class="shell">
+    <aside class="shell-sidebar" id="appSidebar">
+      <div class="shell-brand">
+        <span class="shell-brand-mark" aria-hidden="true"></span>
+        <div class="shell-brand-text">Procurement<br />Simulator</div>
+      </div>
+      {% block sidebar_nav %}
+      <nav class="shell-nav">
+        <p class="shell-nav-label">Group</p>
+        <a class="nav-link {% if active_page == 'create-group' %}is-active{% endif %}" href="{{ url_for('student_views.student_create_group_page') }}">Create Group</a>
+        <a class="nav-link {% if active_page == 'group-details' %}is-active{% endif %}" href="{{ url_for('student_views.student_group_details_page') }}">Group Details</a>
+
+        <p class="shell-nav-label">Client</p>
+        <a class="nav-link {% if active_page == 'lots' %}is-active{% endif %}" href="{{ url_for('student_views.student_lots_page') }}">Lots &amp; RFPs</a>
+        <a class="nav-link {% if active_page == 'view-bids' %}is-active{% endif %}" href="{{ url_for('student_views.student_view_bids_page') }}">Received Bids</a>
+        <a class="nav-link {% if active_page == 'client-evaluation' %}is-active{% endif %}" href="{{ url_for('student_views.student_client_evaluation_page') }}">Evaluation</a>
+
+        <p class="shell-nav-label">Vendor</p>
+        <a class="nav-link {% if active_page == 'rfp-gallery' %}is-active{% endif %}" href="{{ url_for('student_views.rfp_gallery_page') }}">RFP Gallery</a>
+        <a class="nav-link {% if active_page == 'vendor-bids' %}is-active{% endif %}" href="{{ url_for('student_views.submitted_bids_page') }}">Your Bids</a>
+
+        <div style="flex:1"></div>
+        <a class="nav-link is-danger" href="/logout">Logout</a>
+      </nav>
+      {% endblock %}
+    </aside>
+
+    <main class="shell-main">
+      <header class="shell-top">
+        <button type="button" class="mobile-toggle" id="sidebarToggle" aria-label="Open menu">Menu</button>
+        <h1>{{ title }}</h1>
+        {% block toolbar %}{% endblock %}
+      </header>
+
+      <section class="shell-pane">
+        <div class="shell-pane-inner {% block pane_width %}{% endblock %}">
+          {% block content %}{% endblock %}
+        </div>
+      </section>
+    </main>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="toast-stack" id="toastStack" aria-live="polite">
+    {% for category, message in messages %}
+    <div class="toast {% if category == 'success' %}toast-ok{% elif category == 'failed' %}toast-fail{% else %}toast-info{% endif %}" data-toast>
+      <span>{{ message }}</span>
+      <button type="button" class="toast-dismiss" data-toast-dismiss aria-label="Dismiss">×</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+  <script>
+  (function () {
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    if (token) {
+      document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(function (form) {
+        if (!form.querySelector('input[name="csrf_token"]')) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'csrf_token';
+          input.value = token;
+          form.appendChild(input);
+        }
+      });
+    }
+    const sidebar = document.getElementById('appSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    const toggle = document.getElementById('sidebarToggle');
+    function closeNav() {
+      sidebar?.classList.remove('is-open');
+      backdrop?.classList.remove('is-open');
+    }
+    toggle?.addEventListener('click', function () {
+      sidebar.classList.toggle('is-open');
+      backdrop.classList.toggle('is-open');
+    });
+    backdrop?.addEventListener('click', closeNav);
+    sidebar?.querySelectorAll('a.nav-link').forEach(function (link) {
+      link.addEventListener('click', closeNav);
+    });
+
+    function dismissToast(el) {
+      if (!el || el.classList.contains('is-leaving')) return;
+      el.classList.add('is-leaving');
+      setTimeout(function () { el.remove(); }, 200);
+    }
+    document.querySelectorAll('[data-toast]').forEach(function (toast) {
+      toast.querySelector('[data-toast-dismiss]')?.addEventListener('click', function () {
+        dismissToast(toast);
+      });
+      setTimeout(function () { dismissToast(toast); }, 4200);
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+{% extends "student/layout.html" %}
+{% block title %}Create Group{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <span style="font-size:0.875rem; color:var(--ink-muted);">
+    Select {{ others_needed_min }}{% if others_needed_max != others_needed_min %}–{{ others_needed_max }}{% endif %}
+    other member{{ 's' if others_needed_max != 1 else '' }}
+    (total size {{ min_size }}–{{ max_size }} including you)
+  </span>
+</div>
+
+<form method="POST" action="{{ url_for('student_views.student_create_group_page') }}" style="display:flex; flex-direction:column; gap:0.85rem; max-width:40rem;">
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Group name
+    <input class="field" style="margin-top:0.35rem;" id="group-name" name="group_name" type="text" placeholder="e.g. NexoraTech" required />
+  </label>
+
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Search members
+    <input class="field" style="margin-top:0.35rem;" id="member-search" type="text" placeholder="Name or student ID" />
+  </label>
+
+  <div class="surface" style="max-height:22rem; overflow:auto;">
+    <ul style="list-style:none; margin:0; padding:0;">
+      {% for candidate in candidates %}
+      <li class="candidate-item" data-name="{{ candidate.name|lower }}" data-id="{{ candidate.student_id|lower }}"
+          style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; padding:0.75rem 1rem; border-bottom:1px solid var(--line);">
+        <label style="display:flex; width:100%; align-items:center; justify-content:space-between; cursor:pointer; gap:1rem;">
+          <span style="font-weight:550;">{{ candidate.name }} <span style="color:var(--ink-muted); font-weight:500;">({{ candidate.student_id }})</span></span>
+          <input type="checkbox" name="members" value="{{ candidate.id }}" {% if candidate.selected %}checked{% endif %} />
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+    <p id="no-results" style="display:none; text-align:center; color:var(--ink-muted); padding:1rem;">No members found</p>
+  </div>
+
+  <button type="submit" class="btn btn-primary create-group-submit" style="align-self:flex-start; padding:0.65rem 1.25rem;">Submit group request</button>
+</form>
+<style>
+@media (max-width: 700px) {
+  .create-group-submit { align-self: stretch !important; width: 100%; }
+  .candidate-item label { gap: 0.65rem !important; }
+  .candidate-item label > span { font-size: 0.875rem; word-break: break-word; }
+}
+</style>
+
+<script>
+  const searchInput = document.getElementById("member-search");
+  const candidates = document.querySelectorAll(".candidate-item");
+  const noResults = document.getElementById("no-results");
+  searchInput.addEventListener("input", function () {
+    const query = this.value.toLowerCase();
+    let visible = 0;
+    candidates.forEach((candidate) => {
+      const match = candidate.dataset.name.includes(query) || candidate.dataset.id.includes(query);
+      candidate.style.display = match ? "flex" : "none";
+      if (match) visible++;
+    });
+    noResults.style.display = visible === 0 ? "block" : "none";
+  });
+</script>
+{% endblock %}

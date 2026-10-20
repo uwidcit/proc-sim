@@ -1,0 +1,136 @@
+{% extends "student/layout.html" %}
+{% block pane_width %}is-wide{% endblock %}
+{% block content %}
+<div class="tabs" role="tablist">
+  {% for lot in lots %}
+  <button
+    type="button"
+    role="tab"
+    class="tab {% if request.args.get('selected_lot', lots[0].id|string if lots else '1') == lot.id|string %}is-active{% endif %}"
+    onclick="window.location.href='?selected_lot={{ lot.id }}'"
+  >
+    Lot {{ lot.id }}
+  </button>
+  {% endfor %}
+</div>
+
+<div class="toolbar">
+  <div style="min-width:0;">
+    <div class="font-heading" style="font-weight:700;">Evaluation summary</div>
+    <div style="font-size:0.8rem; color:var(--ink-muted);">Compare and select the best bid for this lot.</div>
+  </div>
+</div>
+
+{% if evaluations %}
+<div class="surface table-scroll hide-mobile">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Group / vendor</th>
+        <th class="is-center">Total cost</th>
+        <th class="is-center">Specs met</th>
+        <th class="is-center">Overall</th>
+        <th class="is-center">Preview</th>
+        <th class="is-center">Selected</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for eval in evaluations %}
+      <tr class="{% if eval.is_selected %}is-selected-row{% endif %}">
+        <td>
+          <span class="font-heading" style="font-weight:700;">{{ eval.group_name }}</span>
+        </td>
+        <td class="is-center" style="font-variant-numeric:tabular-nums; font-weight:650;">
+          {{ eval.cost|money }}
+        </td>
+        <td class="is-center">
+          <span class="badge badge-accent">{{ eval.specs_met }}</span>
+        </td>
+        <td class="is-center">
+          <span style="font-weight:700; color:var(--accent-ink);">★ {{ eval.rating }}</span>
+        </td>
+        <td class="is-center">
+          <a class="btn btn-secondary" href="{{ url_for('student_views.student_bid_details_page', bid_id=eval.bid_id) }}">View eval</a>
+        </td>
+        <td class="is-center">
+          {% if eval.is_selected %}
+          <span class="badge badge-ok">Selected</span>
+          {% else %}
+          <form method="POST" class="select-eval-form" data-eval-id="{{ eval.id }}" style="display:inline;">
+            <input type="hidden" name="evaluationID" value="{{ eval.id }}" />
+            <button type="button" class="btn btn-primary select-bid-btn">Select bid</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="mobile-card-list hide-desktop">
+  {% for eval in evaluations %}
+  <article class="mobile-card {% if eval.is_selected %}is-selected{% endif %}">
+    <div class="mobile-card-top">
+      <div class="mobile-card-title">{{ eval.group_name }}</div>
+      {% if eval.is_selected %}
+      <span class="badge badge-ok">Selected</span>
+      {% endif %}
+    </div>
+    <div class="mobile-card-row">
+      <span>Cost <strong>{{ eval.cost|money }}</strong></span>
+      <span class="badge badge-accent">{{ eval.specs_met }} specs</span>
+      <span style="font-weight:700; color:var(--accent-ink);">★ {{ eval.rating }}</span>
+    </div>
+    <div class="mobile-card-actions">
+      <a class="btn btn-secondary" href="{{ url_for('student_views.student_bid_details_page', bid_id=eval.bid_id) }}">View eval</a>
+      {% if not eval.is_selected %}
+      <form method="POST" class="select-eval-form" data-eval-id="{{ eval.id }}">
+        <input type="hidden" name="evaluationID" value="{{ eval.id }}" />
+        <button type="button" class="btn btn-primary select-bid-btn">Select bid</button>
+      </form>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="surface" style="padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
+  No evaluations yet for this lot.
+</div>
+{% endif %}
+
+<div id="confirmSelectModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45); padding:0.75rem;">
+  <div class="surface" style="padding:1.25rem; max-width:24rem; width:100%;">
+    <h3 class="font-heading" style="margin:0 0 0.5rem; font-size:1.05rem;">Confirm selection?</h3>
+    <p style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);">Select this bid as the winning evaluation for the lot.</p>
+    <div style="display:flex; gap:0.5rem; justify-content:flex-end; flex-wrap:wrap;">
+      <button type="button" class="btn btn-secondary" id="cancelSelectBtn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="confirmSelectBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  let selectedForm = null;
+  const modal = document.getElementById('confirmSelectModal');
+
+  document.querySelectorAll('.select-bid-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      selectedForm = btn.closest('.select-eval-form');
+      modal.style.display = 'flex';
+    });
+  });
+
+  document.getElementById('cancelSelectBtn').addEventListener('click', function () {
+    selectedForm = null;
+    modal.style.display = 'none';
+  });
+
+  document.getElementById('confirmSelectBtn').addEventListener('click', function () {
+    if (selectedForm) selectedForm.submit();
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,220 @@
+{% extends "admin/layout.html" %}
+{% block title %}Manage Lots{% endblock %}
+{% block pane_width %}is-wide{% endblock %}
+{% block content %}
+{% set size_options = ['Small', 'Medium', 'Large', 'Extra Large'] %}
+<form
+  method="POST"
+  action="{{ url_for('admin_views.admin_add_lot') }}"
+  class="surface add-lot-form"
+  style="padding:1rem; margin-bottom:1rem; display:grid; grid-template-columns:minmax(10rem,1.2fr) minmax(7rem,0.8fr) minmax(6rem,0.7fr) minmax(7rem,0.8fr) auto; gap:0.75rem; align-items:end;"
+>
+  {% if lab_types %}
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Lab type
+    <select class="field" style="margin-top:0.35rem;" name="lab_type_id" required>
+      <option value="">Select type</option>
+      {% for t in lab_types %}
+      <option value="{{ t.id }}">{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% else %}
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Type name
+    <input class="field" style="margin-top:0.35rem;" type="text" name="lab_type" placeholder="e.g. GIS Lab" required />
+  </label>
+  {% endif %}
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Size
+    <select class="field" style="margin-top:0.35rem;" name="lab_size" required>
+      <option value="">Select size</option>
+      {% for s in size_options %}
+      <option value="{{ s }}">{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Machines
+    <input class="field" style="margin-top:0.35rem;" type="number" min="1" step="1" name="num_machines" placeholder="20" required />
+  </label>
+  <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+    Budget ({{ currency_code }})
+    <input class="field" style="margin-top:0.35rem;" type="number" step="0.01" min="0" name="budget" placeholder="0.00" required />
+  </label>
+  <button type="submit" class="btn btn-primary" style="min-height:2.55rem;">Add lot</button>
+</form>
+
+{% if not lab_types %}
+<p style="margin:0 0 1rem; font-size:0.8rem; color:var(--ink-muted);">
+  Tip: create lab types first so lots can reuse standard type names.
+</p>
+{% endif %}
+
+{% if lots %}
+<div class="panel-grid">
+  {% for lot in lots %}
+  <button
+    type="button"
+    class="panel-card lot-card"
+    data-lot-id="{{ lot.id }}"
+    data-lab-type-id="{{ lot.labTypeId if lot.labTypeId is not none else '' }}"
+    data-lab-type-name="{{ lot.labType }}"
+    data-lab-size="{{ lot.labSize }}"
+    data-num-machines="{{ lot.numMachines }}"
+    data-budget="{{ lot.budget }}"
+  >
+    <span class="panel-card-title">Lot {{ lot.id }}</span>
+    <span class="lot-card-row">
+      <span class="lot-card-label">Type</span>
+      <span class="lot-card-value">{{ lot.labType }}</span>
+    </span>
+    <span class="lot-card-stack">
+      <span class="lot-card-label">Description</span>
+      <span class="lot-card-value">{{ lot.labTypeObj.description if lot.labTypeObj else '—' }}</span>
+    </span>
+    <span class="lot-card-row">
+      <span class="lot-card-label">Size</span>
+      <span class="lot-card-value">{{ lot.labSize or '—' }}</span>
+    </span>
+    <span class="lot-card-row">
+      <span class="lot-card-label">Machines</span>
+      <span class="lot-card-value">{{ lot.numMachines }}</span>
+    </span>
+    <span class="lot-card-row">
+      <span class="lot-card-label">Budget</span>
+      <span class="lot-card-value lot-card-budget">{{ lot.budget|money(0) }}</span>
+    </span>
+  </button>
+  {% endfor %}
+</div>
+{% else %}
+<div class="surface" style="padding:1.25rem; color:var(--ink-muted);">
+  No lots yet. Use the form above to create the first one.
+</div>
+{% endif %}
+
+<div id="lotModal" class="hidden" style="position:fixed; inset:0; z-index:200; display:none; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="width:min(26rem, calc(100% - 2rem)); display:flex; flex-direction:column; max-height:85vh;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:1rem 1.1rem; border-bottom:1px solid var(--line);">
+      <h2 id="lotModalTitle" class="font-heading" style="margin:0; font-size:1.1rem;">Edit lot</h2>
+      <button type="button" class="btn btn-ghost close-lot-modal" aria-label="Close">×</button>
+    </div>
+    <form id="lotForm" method="POST" style="padding:1rem 1.1rem; display:flex; flex-direction:column; gap:0.75rem; overflow:auto;">
+      <input type="hidden" name="lot_id" id="lotId" />
+      {% if lab_types %}
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Lab type
+        <select class="field" style="margin-top:0.35rem;" name="lab_type_id" id="lotLabTypeId">
+          <option value="">Select type</option>
+          {% for t in lab_types %}
+          <option value="{{ t.id }}">{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Type name
+        <input class="field" style="margin-top:0.35rem;" type="text" name="lab_type" id="lotTypeName" />
+      </label>
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Size
+        <select class="field" style="margin-top:0.35rem;" name="lab_size" id="lotSize">
+          <option value="">Select size</option>
+          {% for s in size_options %}
+          <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Machines
+        <input class="field" style="margin-top:0.35rem;" type="number" min="1" step="1" name="num_machines" id="lotMachines" required />
+      </label>
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Budget ({{ currency_code }})
+        <input class="field" style="margin-top:0.35rem;" type="number" step="0.01" min="0" name="budget" id="lotBudget" required />
+      </label>
+    </form>
+    <div style="display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:flex-end; padding:0.85rem 1.1rem; border-top:1px solid var(--line);">
+      <button type="button" class="btn btn-danger" id="removeFromModal" style="margin-right:auto;">Remove</button>
+      <button type="button" class="btn btn-secondary close-lot-modal">Cancel</button>
+      <button type="submit" form="lotForm" class="btn btn-primary" id="lotSubmitButton">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="removeLotModal" class="hidden" style="position:fixed; inset:0; z-index:210; display:none; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="width:min(24rem, calc(100% - 2rem)); padding:1.25rem;">
+    <h3 class="font-heading" style="margin:0 0 0.5rem;">Remove lot?</h3>
+    <p style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);">This permanently removes the lot and associated data.</p>
+    <form id="removeLotForm" method="POST" style="display:flex; gap:0.5rem; justify-content:flex-end;">
+      <button type="button" class="btn btn-secondary" id="cancel-remove-lot">Cancel</button>
+      <button type="submit" class="btn btn-danger">Remove</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  const form = document.getElementById('lotForm');
+  const selectField = document.getElementById('lotLabTypeId');
+  const typeNameInput = document.getElementById('lotTypeName');
+  const sizeInput = document.getElementById('lotSize');
+  const machinesInput = document.getElementById('lotMachines');
+  const budgetInput = document.getElementById('lotBudget');
+  let activeId = null;
+
+  function showModal(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('hidden');
+    el.style.display = 'flex';
+  }
+  function hideModal(id) {
+    const el = document.getElementById(id);
+    el.classList.add('hidden');
+    el.style.display = 'none';
+  }
+
+  document.querySelectorAll('.lot-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      activeId = card.dataset.lotId;
+      form.action = `/admin/lots/${activeId}/edit`;
+      document.getElementById('lotId').value = activeId;
+      if (selectField) selectField.value = card.dataset.labTypeId || '';
+      if (typeNameInput) typeNameInput.value = card.dataset.labTypeName || '';
+      if (sizeInput) sizeInput.value = card.dataset.labSize || '';
+      machinesInput.value = card.dataset.numMachines || '';
+      budgetInput.value = card.dataset.budget || '';
+      document.getElementById('removeLotForm').action = `/admin/lots/${activeId}/remove`;
+      showModal('lotModal');
+    });
+  });
+
+  document.querySelectorAll('.close-lot-modal').forEach(function (btn) {
+    btn.addEventListener('click', function () { hideModal('lotModal'); });
+  });
+
+  document.getElementById('removeFromModal').addEventListener('click', function () {
+    if (!activeId) return;
+    showModal('removeLotModal');
+  });
+
+  document.getElementById('cancel-remove-lot').addEventListener('click', function () {
+    hideModal('removeLotModal');
+  });
+})();
+</script>
+
+<style>
+@media (max-width: 900px) {
+  .add-lot-form {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+@media (max-width: 560px) {
+  .add-lot-form {
+    grid-template-columns: 1fr !important;
+  }
+}
+</style>
+{% endblock %}

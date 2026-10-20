@@ -1,0 +1,4 @@
+# Local development / CI
+-r requirements.txt
+pytest==7.0.1
+pytest-ordering==0.6

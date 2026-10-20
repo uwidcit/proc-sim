@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% block title %}Unauthorized{% endblock %}
+{% block content %}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:2rem;">
+  <div class="surface" style="padding:1.5rem; max-width:24rem; text-align:center;">
+    <h1 class="font-heading" style="margin:0 0 0.5rem; font-size:1.35rem;">Sign in required</h1>
+    <p style="margin:0 0 1rem; color:var(--ink-muted); font-size:0.9rem;">{{ error or "You need to log in to continue." }}</p>
+    <a class="btn btn-primary" href="/">Go to login</a>
+  </div>
+</div>
+{% endblock %}

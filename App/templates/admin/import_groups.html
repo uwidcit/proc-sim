@@ -1,0 +1,22 @@
+{% extends "admin/layout.html" %}
+{% block title %}Import Groups{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <span style="font-size:0.875rem; color:var(--ink-muted);">
+    Size {{ min_size }}–{{ max_size }} · Free lots <strong style="color:var(--ink);">{{ free_lots }}</strong>
+  </span>
+</div>
+
+<div class="surface" style="padding:1.25rem; max-width:32rem;">
+  <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.35rem;">CSV group import</h2>
+  <p style="margin:0 0 1rem; font-size:0.8rem; color:var(--ink-muted); line-height:1.45;">
+    Headers: <code>student_id,name,email,group_name</code>.
+    Groups are auto-approved and each receives 2 exclusive lots.
+    Success downloads temporary passwords.
+  </p>
+  <form method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:0.85rem;">
+    <input class="field" type="file" name="csv_file" accept=".csv,text/csv" required />
+    <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Import &amp; download credentials</button>
+  </form>
+</div>
+{% endblock %}
