@@ -1,6 +1,6 @@
 from App.controllers.studentGroup import add_studentGroup
 from App.database import db
-from .lot import create_lot, edit_lotRFP_details
+from .lot import create_lot
 from .labType import create_lab_type
 from .student import create_student
 from .admin import create_admin
@@ -10,7 +10,8 @@ from .rfp import create_rfp, submit_rfp
 from .bid import create_bid
 from .evaluation import create_evaluation, edit_evaluation, select_evaluation
 from .settings import get_or_create_settings
-from .academic_year import DEFAULT_ACADEMIC_YEAR
+from App.academic_years import SEED_ARCHIVE_YEAR, SEED_OPEN_YEARS, SEED_CURRENT_YEAR
+from .settings import set_active_academic_year
 from App.models import *
 
 
@@ -148,68 +149,87 @@ GROUP_ASSIGN = {
     "Extra Large": {"gis": "G2", "design": "G5", "gov": "G9", "mobile": "G10", "cyber": "G7"},
 }
 
+# Seed RFP drafts: ranges only (no brands/models) — matches student form guidance
 TYPE_SPECS = {
     "gis": dict(
-        deviceType="GIS Workstation",
-        cpu="Intel Core i9-13900K",
-        ram="64GB DDR5",
-        resolution="27-inch 4K IPS",
-        os="Windows 11 Pro",
-        drive="2TB NVMe SSD",
-        gpu="NVIDIA RTX 4080",
-        peripherals="4x USB-A, 2x USB-C, HDMI 2.1, DisplayPort 1.4",
-        features="Mechanical Keyboard, Ergonomic Mouse, Drawing Tablet",
-        io="Webcam, WiFi 6E, Bluetooth 5.2",
+        deviceType="Workstation",
+        cpu="8–16 cores @ 2.5–3.5 GHz",
+        ram="DDR5 · 32–64 GB",
+        resolution="27–32\" · 3840×2160 or higher",
+        os="Windows / Linux",
+        drive="SSD · 1–2 TB (optional secondary HDD)",
+        gpu="Dedicated · 8–16 GB VRAM",
+        peripherals="Keyboard, mouse, drawing tablet",
+        features="Wi‑Fi 6, Bluetooth, dual display support",
+        io="USB‑C, USB‑A 3.x, HDMI, DisplayPort, Ethernet",
     ),
     "design": dict(
-        deviceType="Design Desktop",
-        cpu="Intel Core i9-13900K",
-        ram="64GB DDR5",
-        resolution="Dual 32-inch 4K OLED",
-        os="Windows 11 Pro",
-        drive="2TB NVMe SSD + 2TB HDD",
-        gpu="NVIDIA RTX 4090",
-        peripherals="4x USB-A, 4x USB-C, 2x Thunderbolt 4, SD Card Reader",
-        features="Wireless Ergonomic Keyboard, Precision Mouse, Wacom Tablet",
-        io="Pantone-Calibrated Display, WiFi 6E, Bluetooth 5.2",
+        deviceType="Workstation",
+        cpu="8–16 cores @ 2.8–3.8 GHz",
+        ram="DDR5 · 32–64 GB",
+        resolution="27–32\" · 3840×2160 color-accurate panel",
+        os="Windows / macOS / Linux",
+        drive="SSD · 1–2 TB + optional secondary storage",
+        gpu="Dedicated · 12–24 GB VRAM",
+        peripherals="Keyboard, precision mouse, drawing tablet",
+        features="Wi‑Fi 6, Bluetooth, SD card reader",
+        io="USB‑C / Thunderbolt-class, USB‑A, HDMI, DisplayPort",
     ),
     "gov": dict(
-        deviceType="Office Desktop",
-        cpu="Intel Core i5-13400",
-        ram="16GB DDR4",
-        resolution="24-inch FHD",
-        os="Windows 11 Pro",
-        drive="512GB NVMe SSD",
-        gpu="Intel UHD Graphics 730",
-        peripherals="4x USB-A, 1x USB-C, HDMI 1.4",
-        features="Standard Keyboard, Optical Mouse",
-        io="Webcam, WiFi 5, Bluetooth 4.2",
+        deviceType="Workstation",
+        cpu="4–8 cores @ 2.0–3.2 GHz",
+        ram="DDR4/DDR5 · 8–16 GB",
+        resolution="23–27\" · 1920×1080 or higher",
+        os="Windows",
+        drive="SSD · 256–512 GB",
+        gpu="Integrated",
+        peripherals="Keyboard, mouse",
+        features="Wi‑Fi 5/6, Bluetooth, webcam",
+        io="USB‑A, USB‑C, HDMI, Ethernet, headphone jack",
     ),
     "mobile": dict(
         deviceType="Laptop",
-        cpu="AMD Ryzen 7 7745HX",
-        ram="32GB DDR5",
-        resolution="15.6-inch FHD 144Hz",
-        os="Windows 11 Pro / Ubuntu 22.04 Dual Boot",
-        drive="1TB NVMe SSD",
-        gpu="NVIDIA RTX 3060",
-        peripherals="3x USB-A, 2x USB-C, HDMI 2.0, SD Card Reader",
-        features="Wireless Keyboard, Wireless Mouse, USB Hub",
-        io="Fingerprint Reader, WiFi 6, Bluetooth 5.0",
+        cpu="6–8 cores @ 2.2–3.4 GHz",
+        ram="DDR4/DDR5 · 16–32 GB",
+        resolution="14–16\" · 1920×1080 or higher",
+        os="Windows / Linux",
+        drive="SSD · 512 GB–1 TB",
+        gpu="Integrated or dedicated · 4–8 GB VRAM",
+        peripherals="External mouse, USB hub (optional)",
+        features="Wi‑Fi 6, Bluetooth, webcam, fingerprint reader",
+        io="USB‑C, USB‑A, HDMI, SD reader, headphone jack",
     ),
     "cyber": dict(
-        deviceType="Public Access PC",
-        cpu="Intel Core i5-13400",
-        ram="16GB DDR4",
-        resolution="24-inch FHD",
-        os="Windows 11 Home",
-        drive="512GB NVMe SSD",
-        gpu="Intel UHD Graphics 730",
-        peripherals="4x USB-A, 1x USB-C, HDMI 1.4",
-        features="Standard Keyboard, Optical Mouse",
-        io="Webcam, WiFi 5, Bluetooth 4.2",
+        deviceType="Workstation",
+        cpu="4–8 cores @ 2.0–3.2 GHz",
+        ram="DDR4/DDR5 · 8–16 GB",
+        resolution="23–27\" · 1920×1080",
+        os="Windows / Linux / Chromium OS",
+        drive="SSD · 256–512 GB",
+        gpu="Integrated",
+        peripherals="Keyboard, mouse, headset",
+        features="Wi‑Fi 5/6, Bluetooth, webcam, speakers",
+        io="USB‑A, USB‑C, HDMI, headphone jack",
     ),
 }
+
+
+def _seed_lots(types, academic_year):
+    """Create the 20 size×type lots for a year. Returns {(size, type_key): lot_id}."""
+    lot_ids = {}
+    for size in SIZES:
+        for key in TYPE_KEYS:
+            lab = types[key]
+            lot = create_lot(
+                lab.name,
+                size,
+                BUDGETS[size][key],
+                labTypeId=lab.id,
+                academic_year=academic_year,
+                numMachines=MACHINES[size][key],
+            )
+            lot_ids[(size, key)] = lot.id
+    return lot_ids
 
 
 def initialize():
@@ -217,7 +237,8 @@ def initialize():
     db.create_all()
 
     get_or_create_settings()
-    seed_year = DEFAULT_ACADEMIC_YEAR
+    set_active_academic_year(SEED_CURRENT_YEAR)
+    archive_year = SEED_ARCHIVE_YEAR
     create_admin("bob", "bobpass")
 
     types = {
@@ -243,82 +264,82 @@ def initialize():
         ),
     }
 
-    # 20 lots = every size × type; track lot id by (size, type_key)
-    lot_ids = {}
-    for size in SIZES:
-        for key in TYPE_KEYS:
-            lab = types[key]
-            lot = create_lot(
-                lab.name,
-                size,
-                BUDGETS[size][key],
-                labTypeId=lab.id,
-                academic_year=seed_year,
-                numMachines=MACHINES[size][key],
-            )
-            lot_ids[(size, key)] = lot.id
-            edit_lotRFP_details(lot.id, **TYPE_SPECS[key])
-
-    students = [
-        ("Aiden Joseph", "20240001", "aidenpass", "aiden@lab.local"),
-        ("Kareem Ali", "20240002", "kareempass", "kareem@lab.local"),
-        ("Joshua Peters", "20240003", "joshuapass", "joshua@lab.local"),
-        ("Daniel Roberts", "20240004", "danielpass", "daniel@lab.local"),
-        ("Samantha Clarke", "20240005", "samanthapass", "samantha@lab.local"),
-        ("Aaliyah Mohammed", "20240006", "aaliyahpass", "aaliyah@lab.local"),
-        ("Leah Charles", "20240007", "leahpass", "leah@lab.local"),
-        ("Naomi Thomas", "20240008", "naomipass", "naomi@lab.local"),
-        ("Ryan Williams", "20240009", "ryanpass", "ryan@lab.local"),
-        ("Darius Edwards", "20240010", "dariuspass", "darius@lab.local"),
-        ("Marcus Browne", "20240011", "marcuspass", "marcus@lab.local"),
-        ("Andre Lewis", "20240012", "andrepass", "andre@lab.local"),
-        ("Keisha Grant", "20240013", "keishapass", "keisha@lab.local"),
-        ("Tricia Ramnarine", "20240014", "triciapass", "tricia@lab.local"),
-        ("Anil Singh", "20240015", "anilpass", "anil@lab.local"),
-        ("Ravi Persad", "20240016", "ravipass", "ravi@lab.local"),
-        ("Janelle Baptiste", "20240017", "janellepass", "janelle@lab.local"),
-        ("Shawn Mitchell", "20240018", "shawnpass", "shawn@lab.local"),
-        ("Kevin Hernandez", "20240019", "kevinpass", "kevin@lab.local"),
-        ("Ashley Gomez", "20240020", "ashleypass", "ashley@lab.local"),
-        ("Joey Patterson", "20240021", "joeypass", "joey@lab.local"),
-        ("Michelle James", "20240022", "michellepass", "michelle@lab.local"),
-        ("Tyrell George", "20240023", "tyrellpass", "tyrell@lab.local"),
-        ("Nadia Richards", "20240024", "nadiapass", "nadia@lab.local"),
-        ("Jerome Phillips", "20240025", "jeromepass", "jerome@lab.local"),
-        ("Vanessa Edwards", "20240026", "vanessapass", "vanessa@lab.local"),
-        ("Christopher Lewis", "20240027", "christopherpass", "christopher@lab.local"),
-        ("Melissa Clarke", "20240028", "melissapass", "melissa@lab.local"),
-        ("Devon Peters", "20240029", "devonpass", "devon@lab.local"),
-        ("Sherisse Joseph", "20240030", "sherissepass", "sherisse@lab.local"),
-        ("Darren Mitchell", "20240031", "darrenpass", "darren@lab.local"),
+    # Year-specific student rosters (same people, IDs prefixed by year)
+    student_roster = [
+        ("Aiden Joseph", 1, "aidenpass", "aiden"),
+        ("Kareem Ali", 2, "kareempass", "kareem"),
+        ("Joshua Peters", 3, "joshuapass", "joshua"),
+        ("Daniel Roberts", 4, "danielpass", "daniel"),
+        ("Samantha Clarke", 5, "samanthapass", "samantha"),
+        ("Aaliyah Mohammed", 6, "aaliyahpass", "aaliyah"),
+        ("Leah Charles", 7, "leahpass", "leah"),
+        ("Naomi Thomas", 8, "naomipass", "naomi"),
+        ("Ryan Williams", 9, "ryanpass", "ryan"),
+        ("Darius Edwards", 10, "dariuspass", "darius"),
+        ("Marcus Browne", 11, "marcuspass", "marcus"),
+        ("Andre Lewis", 12, "andrepass", "andre"),
+        ("Keisha Grant", 13, "keishapass", "keisha"),
+        ("Tricia Ramnarine", 14, "triciapass", "tricia"),
+        ("Anil Singh", 15, "anilpass", "anil"),
+        ("Ravi Persad", 16, "ravipass", "ravi"),
+        ("Janelle Baptiste", 17, "janellepass", "janelle"),
+        ("Shawn Mitchell", 18, "shawnpass", "shawn"),
+        ("Kevin Hernandez", 19, "kevinpass", "kevin"),
+        ("Ashley Gomez", 20, "ashleypass", "ashley"),
+        ("Joey Patterson", 21, "joeypass", "joey"),
+        ("Michelle James", 22, "michellepass", "michelle"),
+        ("Tyrell George", 23, "tyrellpass", "tyrell"),
+        ("Nadia Richards", 24, "nadiapass", "nadia"),
+        ("Jerome Phillips", 25, "jeromepass", "jerome"),
+        ("Vanessa Edwards", 26, "vanessapass", "vanessa"),
+        ("Christopher Lewis", 27, "christopherpass", "christopher"),
+        ("Melissa Clarke", 28, "melissapass", "melissa"),
+        ("Devon Peters", 29, "devonpass", "devon"),
+        ("Sherisse Joseph", 30, "sherissepass", "sherisse"),
+        ("Darren Mitchell", 31, "darrenpass", "darren"),
     ]
-    for name, username, password, email in students:
-        create_student(name, username, password, email=email)
+
+    def _seed_students(year):
+        for name, seq, password, email_local in student_roster:
+            create_student(
+                name,
+                f"{year}{seq:04d}",
+                password,
+                email=f"{email_local}{year}@lab.local",
+                academic_year=year,
+            )
+
+    _seed_students(archive_year)
+    for open_year in SEED_OPEN_YEARS:
+        _seed_students(open_year)
+
+    # ─── 2024 archive: full procurement run ───────────────────────────────────
+    lot_ids = _seed_lots(types, archive_year)
 
     group_defs = [
-        ("G1", "NexoraTech", ["20240001", "20240002", "20240003"]),
-        ("G2", "QuantumSoft", ["20240004", "20240005", "20240006"]),
-        ("G3", "ByteForge", ["20240007", "20240008", "20240009"]),
-        ("G4", "CyberNova", ["20240010", "20240011", "20240012"]),
-        ("G5", "InnovateTech", ["20240013", "20240014", "20240015"]),
-        ("G6", "CloudSystems", ["20240016", "20240017", "20240018"]),
-        ("G7", "PixelForge", ["20240019", "20240020", "20240021"]),
-        ("G8", "DataNest", ["20240022", "20240023", "20240024"]),
-        ("G9", "OrbitLabs", ["20240025", "20240026", "20240027"]),
-        ("G10", "NovaBridge", ["20240028", "20240029", "20240030"]),
+        ("G1", "NexoraTech", [1, 2, 3]),
+        ("G2", "QuantumSoft", [4, 5, 6]),
+        ("G3", "ByteForge", [7, 8, 9]),
+        ("G4", "CyberNova", [10, 11, 12]),
+        ("G5", "InnovateTech", [13, 14, 15]),
+        ("G6", "CloudSystems", [16, 17, 18]),
+        ("G7", "PixelForge", [19, 20, 21]),
+        ("G8", "DataNest", [22, 23, 24]),
+        ("G9", "OrbitLabs", [25, 26, 27]),
+        ("G10", "NovaBridge", [28, 29, 30]),
     ]
 
     groups_by_label = {}
-    for label, group_name, usernames in group_defs:
-        group = create_group(group_name, academic_year=seed_year)
-        for username in usernames:
+    for label, group_name, seqs in group_defs:
+        group = create_group(group_name, academic_year=archive_year)
+        for seq in seqs:
+            username = f"{archive_year}{seq:04d}"
             student = db.session.scalars(
                 db.select(Student).where(Student.username == username)
             ).first()
             add_studentGroup(student.id, group.id)
         groups_by_label[label] = group
 
-    # Two exclusive lots per group from the assignment sheet
     lots_by_group = {label: [] for label in groups_by_label}
     for size in SIZES:
         for key in TYPE_KEYS:
@@ -338,14 +359,14 @@ def initialize():
     )
     g1_lots = lots_by_group["G1"]  # Small GIS, Medium Design
     g2_lots = lots_by_group["G2"]  # Small Design, XL GIS
+    lot_type_key = {lid: key for (size, key), lid in lot_ids.items()}
 
-    create_rfp(g1.id, g1_lots[0], status="submitted")
-    create_rfp(g1.id, g1_lots[1], status="submitted")
-    create_rfp(g2.id, g2_lots[0], status="submitted")
-    create_rfp(g2.id, g2_lots[1], status="draft")
-    submit_rfp(g3.id, lots_by_group["G3"][0])
+    create_rfp(g1.id, g1_lots[0], status="submitted", **TYPE_SPECS[lot_type_key[g1_lots[0]]])
+    create_rfp(g1.id, g1_lots[1], status="submitted", **TYPE_SPECS[lot_type_key[g1_lots[1]]])
+    create_rfp(g2.id, g2_lots[0], status="submitted", **TYPE_SPECS[lot_type_key[g2_lots[0]]])
+    create_rfp(g2.id, g2_lots[1], status="draft", **TYPE_SPECS[lot_type_key[g2_lots[1]]])
+    submit_rfp(g3.id, lots_by_group["G3"][0], **TYPE_SPECS[lot_type_key[lots_by_group["G3"][0]]])
 
-    # Three vendor bids on G1 Small GIS — used to test compare-modal cycling.
     bid1 = create_bid(
         g1_lots[0], g2.id, g1.id,
         generate_sample_pdf("QuantumSoft", "GIS Lab", 110000),
@@ -366,7 +387,6 @@ def initialize():
         generate_sample_pdf("QuantumSoft", "Design Studio", 70000),
         "quantumsoft_design_bid.pdf", 70000.00,
     )
-    # Three vendor bids on G2 Small Design.
     bid4 = create_bid(
         g2_lots[0], g1.id, g2.id,
         generate_sample_pdf("NexoraTech", "Design Studio", 68000),
@@ -414,3 +434,7 @@ def initialize():
     select_evaluation(eval2.id)
     select_evaluation(eval4.id)
     select_evaluation(eval6.id)
+
+    # ─── Open years: same lots, students only (no groups / RFPs / bids) ────────
+    for open_year in SEED_OPEN_YEARS:
+        _seed_lots(types, open_year)

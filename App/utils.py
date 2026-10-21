@@ -1,7 +1,61 @@
 """Shared helpers for the procurement simulator."""
 from datetime import datetime
+import re
+from html.parser import HTMLParser
 
 CURRENCY_CODE = "TTD"
+
+_ALLOWED_RICH_TAGS = {
+    "p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "div", "span",
+}
+
+
+class _RichTextSanitizer(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self._parts = []
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if tag not in _ALLOWED_RICH_TAGS:
+            return
+        if tag == "br":
+            self._parts.append("<br>")
+            return
+        self._parts.append(f"<{tag}>")
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if tag in _ALLOWED_RICH_TAGS and tag != "br":
+            self._parts.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        self._parts.append(
+            data.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        )
+
+    def get_html(self):
+        return "".join(self._parts)
+
+
+def sanitize_rich_text(value, max_length=8000):
+    """Allow a small rich-text subset for bid cover messages."""
+    if not value:
+        return ""
+    raw = str(value).strip()
+    if not raw:
+        return ""
+    # Normalize empty editor shells
+    if re.sub(r"<[^>]+>", "", raw).strip() == "":
+        return ""
+    parser = _RichTextSanitizer()
+    try:
+        parser.feed(raw)
+        parser.close()
+    except Exception:
+        return re.sub(r"<[^>]+>", "", raw)[:max_length]
+    cleaned = parser.get_html().strip()
+    return cleaned[:max_length]
 
 
 def format_timestamp(value):

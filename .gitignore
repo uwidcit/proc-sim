@@ -160,3 +160,7 @@ cython_debug/
 
 node_modules/
 instance_tracker.txt
+
+# Local EasyPanel / deploy SSH credentials (never commit)
+.easypanel-ssh.txt
+easypanel-ssh.txt

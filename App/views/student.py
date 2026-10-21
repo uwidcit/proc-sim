@@ -5,7 +5,13 @@ from functools import wraps
 from flask_jwt_extended import jwt_required, current_user
 from App.models import *
 from App.controllers import *
-from App.utils import format_timestamp, get_current_student_group, get_lot_owner_group_id, validate_pdf_upload
+from App.utils import (
+    format_timestamp,
+    get_current_student_group,
+    get_lot_owner_group_id,
+    validate_pdf_upload,
+    sanitize_rich_text,
+)
 
 
 def student_required(f):
@@ -50,12 +56,77 @@ def student_home_page():
     return redirect(url_for('student_views.student_group_details_page'))
 
 
+def _year_mismatch_message(year):
+    return (
+        f"Your account is for {getattr(current_user, 'academic_year', '?')}. "
+        f"Only students for {year} can form groups while that year is active."
+    )
+
+
+def _duplicate_member_message(duplicates):
+    students = []
+    you = False
+    for ID in duplicates:
+        if ID == current_user.id:
+            you = True
+            continue
+        student = get_student(ID)
+        if student:
+            students.append(student)
+
+    if you:
+        if not students:
+            return "You are already in a group"
+        if len(students) >= 2:
+            names = ", ".join(s.name for s in students[:-1]) + f" and {students[-1].name}"
+            return f"You are already in a group and {names} are already in groups"
+        return f"You are already in a group and {students[0].name} is already in a group"
+
+    if len(students) >= 2:
+        names = ", ".join(s.name for s in students[:-1]) + f" and {students[-1].name}"
+        return f"{names} are already in groups"
+    if students:
+        return f"{students[0].name} is already in a group"
+    return "One or more selected students are already in a group"
+
+
+def _group_form_candidates(year, selected_ids=None, exclude_group_id=None):
+    """Free students for the year, plus currently selected members of a pending group."""
+    selected_ids = set(selected_ids or [])
+    taken_ids = set(students_in_groups_for_year(year))
+    if exclude_group_id:
+        own_members = db.session.scalars(
+            db.select(StudentGroup.studentID).filter_by(groupID=exclude_group_id)
+        ).all()
+        taken_ids -= set(own_members)
+
+    students = db.session.scalars(
+        db.select(Student).filter_by(academic_year=year).order_by(Student.name)
+    ).all()
+    candidates = []
+    for student in students:
+        if student.id == current_user.id:
+            continue
+        if student.id in taken_ids and student.id not in selected_ids:
+            continue
+        candidates.append({
+            "id": student.id,
+            "name": student.name,
+            "student_id": student.username,
+            "selected": student.id in selected_ids,
+        })
+    return candidates
+
+
 @student_views.route('/student/create-group', methods=['GET', 'POST'])
 @student_required
 def student_create_group_page():
     exists = check_studentGroup(current_user.id)
 
     if exists:
+        group = get_group(exists.groupID)
+        if group and group.status == "requested":
+            return redirect(url_for('student_views.student_edit_group_page'))
         flash("You are already in a group", "failed")
         return redirect(url_for('student_views.student_group_details_page'))
 
@@ -67,9 +138,18 @@ def student_create_group_page():
 
         members.append(str(current_user.id))
 
-        duplicates = []
-
         year = get_current_year()
+        if getattr(current_user, "academic_year", None) != year:
+            flash(_year_mismatch_message(year), "failed")
+            return redirect(url_for('student_views.student_create_group_page'))
+
+        for member in members:
+            student = get_student(int(member))
+            if not student or student.academic_year != year:
+                flash("You can only add students from the current academic year", "failed")
+                return redirect(url_for('student_views.student_create_group_page'))
+
+        duplicates = []
         for member in members:
             existing = db.session.scalars(
                 db.select(StudentGroup)
@@ -79,62 +159,12 @@ def student_create_group_page():
                     Group.academic_year == year,
                 )
             ).first()
-
             if existing:
                 duplicates.append(int(member))
 
         if duplicates:
-            students = []
-            you = False
-
-            for ID in duplicates:
-                if ID == current_user.id:
-                    you = True
-                    continue
-
-                student = get_student(ID)
-
-                if student:
-                    students.append(student)
-
-            if you:
-                strings = []
-                for student in students:
-                    string = f"{student.name}, "
-                    strings.append(string)
-
-                if not strings:
-                    flash("You are already in a group", "failed")
-                    return redirect(url_for('student_views.student_create_group_page'))
-
-                if len(strings) >= 2:
-                    strings[-2] = f"{students[-2].name} and "
-                    strings[-1] = f"{students[-1].name}"
-
-                    flash(f"You are already in a group and {''.join(strings)} are already in groups", "failed")
-                    return redirect(url_for('student_views.student_create_group_page'))
-                else:
-                    strings[0] = f"{students[0].name}"
-
-                    flash(f"You are already in a group and {''.join(strings)} is already in a group", "failed")
-                    return redirect(url_for('student_views.student_create_group_page'))
-            else:
-                strings = []
-                for student in students:
-                    string = f"{student.name}, "
-                    strings.append(string)
-
-                if len(strings) >= 2:
-                    strings[-2] = f"{students[-2].name} and "
-                    strings[-1] = f"{students[-1].name}"
-
-                    flash(f"{''.join(strings)} are already in groups", "failed")
-                    return redirect(url_for('student_views.student_create_group_page'))
-                else:
-                    strings[0] = f"{students[0].name}"
-
-                    flash(f"{''.join(strings)} is already in a group", "failed")
-                    return redirect(url_for('student_views.student_create_group_page'))
+            flash(_duplicate_member_message(duplicates), "failed")
+            return redirect(url_for('student_views.student_create_group_page'))
 
         if name == "":
             flash("You must enter a group name", "failed")
@@ -155,35 +185,129 @@ def student_create_group_page():
         flash(f"Group '{name}' created successfully!", "success")
         return redirect(url_for('student_views.student_group_details_page'))
 
-    taken_ids = students_in_groups_for_year()
-    student_query = db.select(Student)
-    if taken_ids:
-        student_query = student_query.where(~Student.id.in_(taken_ids))
-    students = db.session.scalars(student_query).all()
+    year = get_current_year()
+    if getattr(current_user, "academic_year", None) != year:
+        flash(_year_mismatch_message(year), "failed")
+        return render_template(
+            'student/create_group.html',
+            active_page='create-group',
+            title='Create Group',
+            form_action=url_for('student_views.student_create_group_page'),
+            submit_label='Submit group request',
+            group_name_value='',
+            candidates=[],
+            min_size=min_size,
+            max_size=max_size,
+            others_needed_min=max(0, min_size - 1),
+            others_needed_max=max(0, max_size - 1),
+            editing=False,
+        )
 
-    candidates = []
-
-    for student in students:
-        if student.id == current_user.id:
-            continue
-
-        candidate = {}
-        candidate["id"] = student.id
-        candidate["name"] = student.name
-        candidate["student_id"] = student.username
-        candidate["selected"] = False
-
-        candidates.append(candidate)
+    candidates = _group_form_candidates(year)
 
     return render_template(
         'student/create_group.html',
         active_page='create-group',
         title='Create Group',
+        form_action=url_for('student_views.student_create_group_page'),
+        submit_label='Submit group request',
+        group_name_value='',
         candidates=candidates,
         min_size=min_size,
         max_size=max_size,
         others_needed_min=max(0, min_size - 1),
         others_needed_max=max(0, max_size - 1),
+        editing=False,
+    )
+
+
+@student_views.route('/student/edit-group', methods=['GET', 'POST'])
+@student_required
+def student_edit_group_page():
+    exists = check_studentGroup(current_user.id)
+    if not exists:
+        flash("You do not have a group request to edit", "info")
+        return redirect(url_for('student_views.student_create_group_page'))
+
+    group = get_group(exists.groupID)
+    if not group or group.status != "requested":
+        flash("Only pending group requests can be edited", "failed")
+        return redirect(url_for('student_views.student_group_details_page'))
+
+    min_size, max_size = get_group_size_range()
+    year = get_current_year()
+
+    if request.method == 'POST':
+        name = request.form.get('group_name')
+        members = request.form.getlist('members')
+        members.append(str(current_user.id))
+
+        if getattr(current_user, "academic_year", None) != year:
+            flash(_year_mismatch_message(year), "failed")
+            return redirect(url_for('student_views.student_edit_group_page'))
+
+        for member in members:
+            student = get_student(int(member))
+            if not student or student.academic_year != year:
+                flash("You can only add students from the current academic year", "failed")
+                return redirect(url_for('student_views.student_edit_group_page'))
+
+        if len(members) < min_size or len(members) > max_size:
+            flash(
+                f"Group size must be between {min_size} and {max_size} members (including you)",
+                "failed",
+            )
+            return redirect(url_for('student_views.student_edit_group_page'))
+
+        duplicates = []
+        for member in members:
+            existing = db.session.scalars(
+                db.select(StudentGroup)
+                .join(Group, Group.id == StudentGroup.groupID)
+                .filter(
+                    StudentGroup.studentID == int(member),
+                    Group.academic_year == year,
+                    Group.id != group.id,
+                )
+            ).first()
+            if existing:
+                duplicates.append(int(member))
+
+        if duplicates:
+            flash(_duplicate_member_message(duplicates), "failed")
+            return redirect(url_for('student_views.student_edit_group_page'))
+
+        updated, err = update_pending_group(group.id, name, members)
+        if err:
+            flash(err, "failed")
+            return redirect(url_for('student_views.student_edit_group_page'))
+
+        flash(f"Group request '{display_group_name(updated)}' updated", "success")
+        return redirect(url_for('student_views.student_group_details_page'))
+
+    current_member_ids = db.session.scalars(
+        db.select(StudentGroup.studentID).filter_by(groupID=group.id)
+    ).all()
+    selected_others = [sid for sid in current_member_ids if sid != current_user.id]
+    candidates = _group_form_candidates(
+        year,
+        selected_ids=selected_others,
+        exclude_group_id=group.id,
+    )
+
+    return render_template(
+        'student/create_group.html',
+        active_page='create-group',
+        title='Edit Group Request',
+        form_action=url_for('student_views.student_edit_group_page'),
+        submit_label='Save changes',
+        group_name_value=display_group_name(group),
+        candidates=candidates,
+        min_size=min_size,
+        max_size=max_size,
+        others_needed_min=max(0, min_size - 1),
+        others_needed_max=max(0, max_size - 1),
+        editing=True,
     )
 
 
@@ -236,21 +360,12 @@ def student_lots_page():
             flash("That lot is not assigned to your group", "failed")
             return redirect(url_for('student_views.student_lots_page'))
 
-        specs = dict(
-            deviceType=request.form.get('deviceType'),
-            resolution=request.form.get('screen'),
-            os=request.form.get('os'),
-            cpu=request.form.get('cpu'),
-            ram=request.form.get('ram'),
-            drive=request.form.get('storage'),
-            gpu=request.form.get('graphics'),
-            peripherals=request.form.get('peripherals'),
-            features=request.form.get('features'),
-            io=request.form.get('io'),
-        )
+        from App.controllers.rfp_form import assemble_rfp_specs
 
-        # Keep lot catalog copy in sync for display convenience
-        edit_lotRFP_details(id=lot_id, **specs)
+        specs = assemble_rfp_specs(request.form)
+        if not specs.get("deviceType"):
+            flash("Select a device type", "failed")
+            return redirect(url_for('student_views.student_lots_page', selected_lot=lot_id))
 
         if action == 'submit':
             rfp, err = submit_rfp(yourGroup.id, lot_id, **specs)
@@ -287,21 +402,54 @@ def student_lots_page():
 
     existing_rfp = get_rfp(yourGroup.id, int(selected_lot_id))
 
-    # Prefer RFP draft field values for the form when present
-    if existing_rfp:
-        for field in ('deviceType', 'resolution', 'os', 'cpu', 'ram', 'drive', 'gpu', 'peripherals', 'features', 'io'):
-            val = getattr(existing_rfp, field, None)
-            if val:
-                setattr(current_lot, field, val)
+    from App.controllers.rfp_form import (
+        parse_rfp_ui,
+        DEVICE_TYPES,
+        OS_OPTIONS,
+        RESOLUTION_OPTIONS,
+        RAM_FORM_FACTORS,
+        DRIVE_INTERFACES,
+        GPU_RESOLUTION_OPTIONS,
+        PERIPHERAL_OPTIONS,
+        FEATURE_OPTIONS,
+        IO_OPTIONS,
+    )
 
+    # Form starts empty; only show saved draft / submitted RFP values
+    rfp_fields = (
+        'deviceType', 'resolution', 'os', 'cpu', 'ram', 'drive',
+        'gpu', 'peripherals', 'features', 'io',
+    )
+    rfp_form = {field: '' for field in rfp_fields}
+    if existing_rfp:
+        for field in rfp_fields:
+            rfp_form[field] = getattr(existing_rfp, field, '') or ''
+    rfp_ui = parse_rfp_ui(rfp_form)
+
+    page_title = (
+        f"RFP for Lot {current_lot.id}"
+        if existing_rfp and existing_rfp.status == "submitted"
+        else f"Create RFP for Lot {current_lot.id}"
+    )
     return render_template(
         'student/client_lots.html',
         active_page='lots',
-        title='Assigned Lots & RFPs',
+        title=page_title,
         lots=lots,
         current_lot=current_lot,
+        rfp_form=rfp_form,
+        rfp_ui=rfp_ui,
         existing_rfp=existing_rfp,
         rfp_locked=bool(existing_rfp and existing_rfp.status == 'submitted'),
+        device_types=DEVICE_TYPES,
+        os_options=OS_OPTIONS,
+        resolution_options=RESOLUTION_OPTIONS,
+        ram_form_factors=RAM_FORM_FACTORS,
+        drive_interfaces=DRIVE_INTERFACES,
+        gpu_resolution_options=GPU_RESOLUTION_OPTIONS,
+        peripheral_options=PERIPHERAL_OPTIONS,
+        feature_options=FEATURE_OPTIONS,
+        io_options=IO_OPTIONS,
     )
 
 
@@ -378,18 +526,9 @@ def student_view_bids_page():
 @student_required
 @group_status_check
 def student_bid_details_page(bid_id):
-    technical_specs = [
-        ('deviceType', 'Device Type'),
-        ('resolution', 'Screen Size & Resolution'),
-        ('os', 'Operating System(s)'),
-        ('cpu', 'CPU'),
-        ('ram', 'Memory (RAM)'),
-        ('drive', 'Hard Drive'),
-        ('gpu', 'Graphics'),
-        ('peripherals', 'External Peripherals'),
-        ('features', 'Features'),
-        ('io', 'I/O')
-    ]
+    from App.controllers.rfp import RFP_SPEC_CATEGORIES, RFP_FIELDS, rfp_specs_dict
+
+    technical_specs = list(RFP_SPEC_CATEGORIES)
 
     yourGroup = get_current_student_group(current_user.id)
     bidObj = get_bid(bid_id)
@@ -407,6 +546,7 @@ def student_bid_details_page(bid_id):
         "timestamp": format_timestamp(bidObj.timestamp),
         "pdf": bidObj.bidDocument,
         "filename": bidObj.bidDocumentName,
+        "message": bidObj.message or "",
     }
 
     lotObj = get_lot(bidObj.lotID)
@@ -418,21 +558,16 @@ def student_bid_details_page(bid_id):
     }
 
     if request.method == 'POST':
-        specsMet = request.form.getlist("specs_selected")
-        professionalism = int(request.form.get("professionalism_stars"))
-        presentation = int(request.form.get("presentation_stars"))
-        budget = int(request.form.get("budget_stars"))
+        allowed = set(RFP_FIELDS)
+        specsMet = [k for k in request.form.getlist("specs_selected") if k in allowed]
+        professionalism = int(request.form.get("professionalism_stars") or 0)
+        presentation = int(request.form.get("presentation_stars") or 0)
+        budget = int(request.form.get("budget_stars") or 0)
 
-        deviceType = request.form.get("comment_deviceType")
-        resolution = request.form.get("comment_resolution")
-        os = request.form.get("comment_os")
-        cpu = request.form.get("comment_cpu")
-        ram = request.form.get("comment_ram")
-        drive = request.form.get("comment_drive")
-        gpu = request.form.get("comment_gpu")
-        peripherals = request.form.get("comment_peripherals")
-        features = request.form.get("comment_features")
-        io = request.form.get("comment_io")
+        comments = {
+            key: (request.form.get(f"comment_{key}") or "")
+            for key in RFP_FIELDS
+        }
 
         sourceGroupID = bidObj.recipientGroupID
         recipientGroupID = bidObj.sourceGroupID
@@ -445,9 +580,8 @@ def student_bid_details_page(bid_id):
         if existing:
             edit_evaluation(
                 existing.id, len(specsMet), presentation, professionalism, budget,
-                deviceType=deviceType, resolution=resolution, os=os, cpu=cpu, ram=ram,
-                drive=drive, gpu=gpu, peripherals=peripherals, features=features, io=io,
                 specsSelected=','.join(specsMet),
+                **comments,
             )
             flash("Evaluation updated successfully", "success")
             return redirect(url_for('student_views.student_bid_details_page', bid_id=bid_id))
@@ -458,9 +592,8 @@ def student_bid_details_page(bid_id):
         )
         edit_evaluation(
             evaluation.id, len(specsMet), presentation, professionalism, budget,
-            deviceType=deviceType, resolution=resolution, os=os, cpu=cpu, ram=ram,
-            drive=drive, gpu=gpu, peripherals=peripherals, features=features, io=io,
             specsSelected=','.join(specsMet),
+            **comments,
         )
 
         flash("Evaluation created successfully", "success")
@@ -469,6 +602,9 @@ def student_bid_details_page(bid_id):
     existing = db.session.scalars(
         db.select(Evaluation).filter_by(bidID=bid_id)
     ).first()
+
+    lot_rfp = get_rfp(yourGroup.id, bidObj.lotID)
+    rfp_requirements = rfp_specs_dict(lot_rfp)
 
     lot_bids = db.session.scalars(
         db.select(Bid)
@@ -500,6 +636,7 @@ def student_bid_details_page(bid_id):
         bid=bid,
         lot=lot,
         technical_specs=technical_specs,
+        rfp_requirements=rfp_requirements,
         existing=existing,
         lot_bid_nav=lot_bid_nav,
         peer_index=peer_index,
@@ -629,7 +766,16 @@ def rfp_gallery_page():
             return redirect(url_for('student_views.rfp_gallery_page'))
 
         lot = get_lot(lotID)
-        create_bid(lotID, yourGroup.id, owner_id, pdf.read(), pdf.filename, amount)
+        message = sanitize_rich_text(request.form.get("message"))
+        create_bid(
+            lotID,
+            yourGroup.id,
+            owner_id,
+            pdf.read(),
+            pdf.filename,
+            amount,
+            message=message,
+        )
         flash(f"Bid successfully placed on Lot {lotID} ({lot.labType})", "success")
         return redirect(url_for('student_views.rfp_gallery_page'))
 
@@ -686,10 +832,13 @@ def rfp_gallery_page():
 @student_required
 @group_status_check
 def submitted_bids_page():
+    from App.controllers.settings import are_results_published
+
     submitted_bids = []
     accepted = 0
     pending = 0
     rejected = 0
+    results_published = are_results_published()
 
     yourGroup = get_current_student_group(current_user.id)
 
@@ -715,7 +864,8 @@ def submitted_bids_page():
             )
         ).first()
 
-        if selected:
+        # Hide award outcomes until admin publishes results
+        if results_published and selected:
             if selected.bidID == bid.id:
                 data["status"] = "Accepted"
                 accepted += 1
@@ -735,7 +885,8 @@ def submitted_bids_page():
         title='My Submitted Bids',
         accepted=accepted,
         pending=pending,
-        rejected=rejected
+        rejected=rejected,
+        results_published=results_published,
     )
 
 

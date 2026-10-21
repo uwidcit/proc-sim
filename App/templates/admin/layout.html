@@ -50,17 +50,20 @@
       </div>
       {% block sidebar_nav %}
       <nav class="shell-nav">
-        <p class="shell-nav-label">Academic Year</p>
+        <p class="shell-nav-label">Current Year</p>
         <form class="year-switcher" method="post" action="{{ url_for('index_views.set_academic_year') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
           <input type="hidden" name="next" value="{{ request.path }}" />
-          <label class="sr-only" for="academicYearSelect">Academic year</label>
+          <label class="sr-only" for="academicYearSelect">Current academic year</label>
           <select id="academicYearSelect" name="year" class="year-select" onchange="this.form.submit()">
             {% for y in academic_years %}
-            <option value="{{ y }}" {% if y == current_academic_year %}selected{% endif %}>{{ y }}</option>
+            <option value="{{ y }}" {% if y == active_academic_year %}selected{% endif %}>{{ y }}</option>
             {% endfor %}
           </select>
         </form>
+        <p class="shell-nav-hint" style="margin:0.35rem 0 0; font-size:0.7rem; color:var(--ink-muted); line-height:1.35;">
+          Applies to all students
+        </p>
         <p class="shell-nav-label">Workspace</p>
         <a class="nav-link {% if active_page == 'types' %}is-active{% endif %}" href="{{ url_for('admin_views.admin_manage_lab_types') }}">Lab Types</a>
         <a class="nav-link {% if active_page == 'lots' %}is-active{% endif %}" href="{{ url_for('admin_views.admin_manage_lots') }}">Lots</a>

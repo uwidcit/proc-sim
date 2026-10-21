@@ -1,28 +1,51 @@
-from flask import Blueprint, render_template, jsonify, request, flash, send_from_directory, flash, redirect, url_for
+from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for
 from flask_jwt_extended import jwt_required, current_user, unset_jwt_cookies, set_access_cookies
-
-
-from.index import index_views
 
 from App.controllers import (
     login,
-
+    register_student,
 )
 
 auth_views = Blueprint('auth_views', __name__, template_folder='../templates')
 
 
-
-
 '''
 Page/Action Routes
-'''    
+'''
 
 @auth_views.route('/identify', methods=['GET'])
 @jwt_required()
 def identify_page():
     return render_template('message.html', title="Identify", message=f"You are logged in as {current_user.id} - {current_user.username}")
-    
+
+
+@auth_views.route('/register', methods=['GET', 'POST'])
+def register_page():
+    if request.method == 'POST':
+        student, err = register_student(
+            name=request.form.get('name'),
+            student_id=request.form.get('student_id'),
+            password=request.form.get('password'),
+            confirm_password=request.form.get('confirm_password'),
+            email=request.form.get('email'),
+        )
+        if err:
+            flash(err, "failed")
+            return render_template(
+                'register.html',
+                name=request.form.get('name', ''),
+                student_id=request.form.get('student_id', ''),
+                email=request.form.get('email', ''),
+            )
+
+        user, token, role = login(student.username, request.form.get('password'))
+        flash("Account created. Welcome!", "success")
+        response = redirect('/student')
+        set_access_cookies(response, token)
+        return response
+
+    return render_template('register.html')
+
 
 @auth_views.route('/login', methods=['POST'])
 def login_action():

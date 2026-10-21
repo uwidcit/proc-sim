@@ -834,17 +834,21 @@ body.app-shell {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.15rem;
+  min-height: 2.5rem;
+  height: auto;
   border-bottom: 1px solid var(--line);
   margin-bottom: 1rem;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  overflow: visible;
 }
 .tab {
+  flex: 0 0 auto;
   padding: 0.55rem 0.9rem;
   font-size: 0.8125rem;
   font-weight: 650;
+  line-height: 1.25;
   color: var(--ink-muted);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -855,7 +859,6 @@ body.app-shell {
   cursor: pointer;
   font-family: var(--font-body);
   white-space: nowrap;
-  flex-shrink: 0;
 }
 .tab.is-active {
   color: var(--accent-ink);
@@ -1192,4 +1195,79 @@ body.app-shell {
   .btn {
     transition: none;
   }
+}
+
+/* Rich text (bid cover message) */
+.rich-editor {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.rich-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem 0.45rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.rich-editor-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.rich-editor-btn:hover {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.rich-editor-body {
+  min-height: 6.5rem;
+  max-height: 12rem;
+  overflow: auto;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  outline: none;
+}
+
+.rich-editor-body:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.rich-text-content {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.rich-text-content p {
+  margin: 0 0 0.55rem;
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0 0 0.55rem;
+  padding-left: 1.25rem;
+}
+
+.bid-message-panel {
+  padding: 0;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.bid-message-panel .rich-text-content {
+  padding: 0.85rem 1rem 1rem;
 }

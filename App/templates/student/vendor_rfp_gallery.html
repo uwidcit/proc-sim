@@ -122,20 +122,41 @@
 </div>
 
 <div id="placeBidModal" class="hidden mobile-sheet-host" style="position:fixed; inset:0; z-index:200; display:none; align-items:center; justify-content:center; background:rgba(20,33,43,0.45); padding:0.75rem;">
-  <div class="surface mobile-sheet" style="width:min(28rem, calc(100% - 2rem)); max-height:95vh; overflow:auto;">
+  <div class="surface mobile-sheet" style="width:min(34rem, calc(100% - 2rem)); max-height:95vh; overflow:auto;">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:1rem 1.1rem; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--surface); z-index:1;">
       <button type="button" class="btn btn-ghost child-screen-back" onclick="hideBidModal()">← Back</button>
       <h2 class="font-heading" style="margin:0; font-size:1.1rem; flex:1;">Place a bid</h2>
       <button type="button" class="btn btn-ghost desktop-only-close" onclick="hideBidModal()">×</button>
     </div>
-    <form method="POST" action="{{ url_for('student_views.rfp_gallery_page') }}" enctype="multipart/form-data" style="padding:1rem 1.1rem; display:flex; flex-direction:column; gap:0.85rem;">
+    <form id="placeBidForm" method="POST" action="{{ url_for('student_views.rfp_gallery_page') }}" enctype="multipart/form-data" style="padding:1rem 1.1rem; display:flex; flex-direction:column; gap:0.85rem;">
       <input type="hidden" id="bid-groupID" name="groupID" />
       <input type="hidden" id="bid-lotID" name="lotID" />
       <input type="hidden" name="sourceGroupID" value="{{ sourceGroupID }}" />
+      <input type="hidden" id="bid-message" name="message" value="" />
       <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
         Quotation amount ({{ currency_code }})
         <input class="field" style="margin-top:0.35rem;" type="number" id="bid-amount" name="amount" min="0" step="0.01" placeholder="0.00" required />
       </label>
+      <div>
+        <div style="font-size:0.75rem; font-weight:650; color:var(--ink-muted); margin-bottom:0.35rem;">Cover message <span style="font-weight:500;">(optional)</span></div>
+        <div class="rich-editor">
+          <div class="rich-editor-toolbar" role="toolbar" aria-label="Formatting">
+            <button type="button" class="rich-editor-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+            <button type="button" class="rich-editor-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+            <button type="button" class="rich-editor-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+            <button type="button" class="rich-editor-btn" data-cmd="insertUnorderedList" title="Bullet list">• List</button>
+            <button type="button" class="rich-editor-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+          </div>
+          <div
+            id="bid-message-editor"
+            class="rich-editor-body"
+            contenteditable="true"
+            role="textbox"
+            aria-multiline="true"
+            data-placeholder="Introduce your proposal, highlight strengths, or note assumptions…"
+          ></div>
+        </div>
+      </div>
       <div id="drop-zone" class="surface" style="padding:1.25rem; text-align:center; border-style:dashed; cursor:pointer;"
         onclick="document.getElementById('bid-pdf').click()"
         ondragover="event.preventDefault(); this.style.borderColor='var(--accent)';"
@@ -184,6 +205,10 @@ function showBidModal(groupID, lotID) {
   document.getElementById('bid-lotID').value = lotID;
   document.getElementById('drop-label').textContent = 'Drag & drop PDF, or click to browse';
   document.getElementById('bid-pdf').value = '';
+  document.getElementById('bid-amount').value = '';
+  const editor = document.getElementById('bid-message-editor');
+  editor.innerHTML = '';
+  document.getElementById('bid-message').value = '';
   showModal('placeBidModal');
 }
 function hideBidModal() { hideModal('placeBidModal'); }
@@ -204,6 +229,13 @@ function handleDrop(event) {
     document.getElementById('drop-label').textContent = 'Please drop a PDF file only';
   }
 }
+document.querySelectorAll('.rich-editor-btn').forEach(function (btn) {
+  btn.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    document.execCommand(btn.dataset.cmd, false, null);
+    document.getElementById('bid-message-editor').focus();
+  });
+});
 function submitBid() {
   const pdf = document.getElementById('bid-pdf');
   const amount = document.getElementById('bid-amount').value;
@@ -215,7 +247,8 @@ function submitBid() {
     alert('Please enter a valid quotation amount.');
     return;
   }
-  pdf.closest('form').submit();
+  document.getElementById('bid-message').value = document.getElementById('bid-message-editor').innerHTML;
+  document.getElementById('placeBidForm').submit();
 }
 </script>
 {% endblock %}

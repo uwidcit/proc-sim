@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% block title %}Create student account · Procurement Simulator{% endblock %}
+
+{% block content %}
+<div class="login-stage">
+  <section class="login-hero" aria-label="Brand">
+    <div class="login-hero-inner">
+      <p style="margin:0 0 0.75rem; font-size:0.75rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:rgba(204,251,241,0.7);">
+        Lab teaching platform
+      </p>
+      <h1 class="login-brand">Procurement Simulator</h1>
+      <p class="login-lede">
+        Create a student account for the current lab year, then form a group and join the procurement run.
+      </p>
+    </div>
+  </section>
+
+  <section class="login-panel">
+    <div class="login-card" style="max-width:24rem;">
+      <h2>Create student account</h2>
+      <p>Registers for academic year <strong>{{ active_academic_year }}</strong>. Use your student ID as your username.</p>
+      <form method="POST" action="{{ url_for('auth_views.register_page') }}" style="display:flex; flex-direction:column; gap:0.75rem;">
+        <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+          Full name
+          <input class="field" style="margin-top:0.35rem;" name="name" type="text" required maxlength="100" autocomplete="name" value="{{ name or '' }}" />
+        </label>
+        <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+          Student ID
+          <input class="field" style="margin-top:0.35rem;" name="student_id" type="text" required maxlength="20" autocomplete="username" value="{{ student_id or '' }}" placeholder="e.g. 20249901" />
+        </label>
+        <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+          Email <span style="font-weight:500;">(optional)</span>
+          <input class="field" style="margin-top:0.35rem;" name="email" type="email" maxlength="120" autocomplete="email" value="{{ email or '' }}" />
+        </label>
+        <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+          Password
+          <input class="field" style="margin-top:0.35rem;" name="password" type="password" required minlength="6" autocomplete="new-password" />
+        </label>
+        <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+          Confirm password
+          <input class="field" style="margin-top:0.35rem;" name="confirm_password" type="password" required minlength="6" autocomplete="new-password" />
+        </label>
+        <button type="submit" class="btn btn-primary" style="width:100%; padding:0.75rem; margin-top:0.35rem;">
+          Create account
+        </button>
+      </form>
+      <p style="margin:1rem 0 0; font-size:0.85rem;">
+        Already registered?
+        <a href="{{ url_for('index_views.index_page') }}" style="color:var(--accent-ink); font-weight:650; text-decoration:none;">Sign in</a>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

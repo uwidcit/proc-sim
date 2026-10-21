@@ -46,6 +46,10 @@
             Login
           </button>
         </form>
+        <p style="margin:1rem 0 0; font-size:0.85rem;">
+          New student?
+          <a href="{{ url_for('auth_views.register_page') }}" style="color:var(--accent-ink); font-weight:650; text-decoration:none;">Create an account</a>
+        </p>
       {% endif %}
     </div>
   </section>

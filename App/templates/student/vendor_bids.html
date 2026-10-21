@@ -12,6 +12,12 @@
   </span>
 </div>
 
+{% if not results_published %}
+<div class="surface" style="padding:0.75rem 1rem; margin-bottom:0.75rem; font-size:0.875rem; color:var(--ink-muted);">
+  Award outcomes stay <strong style="color:var(--ink);">Pending</strong> until an admin publishes results.
+</div>
+{% endif %}
+
 <div class="stat-strip">
   <div class="stat-strip-item is-ok">
     <span class="stat-strip-value">{{ accepted }}</span>

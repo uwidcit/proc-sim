@@ -53,6 +53,7 @@ class StudentUnitTests(unittest.TestCase):
         student_json = student.get_json()
         assert student_json["username"] == "20240123"
         assert student_json["role"] == "student"
+        assert student_json["academic_year"] == 2026
 
     @pytest.mark.run(order=9)
     def test_student_hashed_password(self):
@@ -85,7 +86,7 @@ class GroupUnitTests(unittest.TestCase):
         group = Group("Algorithms")
         group_json = group.get_json()
         assert group_json["groupName"] == "Algorithms"
-        assert group_json["academic_year"] == 2025
+        assert group_json["academic_year"] == 2026
 
 
 class StudentGroupUnitTests(unittest.TestCase):
@@ -130,7 +131,7 @@ class LotUnitTests(unittest.TestCase):
             "labSize": "Medium",
             "numMachines": 20,
             "budget": 5000.00,
-            "academic_year": 2025,
+            "academic_year": 2026,
         })
 
     @pytest.mark.run(order=21)

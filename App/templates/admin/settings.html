@@ -7,19 +7,50 @@
   </span>
 </div>
 
-<div class="surface" style="padding:1.25rem; max-width:28rem;">
-  <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.35rem;">Group size range</h2>
-  <p style="margin:0 0 1rem; font-size:0.8rem; color:var(--ink-muted);">Applies to student create-group and CSV imports (including the creator).</p>
-  <form method="POST" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
-    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
-      Minimum
-      <input class="field" style="margin-top:0.35rem;" id="group_size_min" name="group_size_min" type="number" min="1" value="{{ settings.group_size_min }}" />
-    </label>
-    <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
-      Maximum
-      <input class="field" style="margin-top:0.35rem;" id="group_size_max" name="group_size_max" type="number" min="1" value="{{ settings.group_size_max }}" />
-    </label>
-    <div style="grid-column:1/-1;">
+<div class="surface" style="padding:1.25rem; max-width:28rem; display:grid; gap:1.5rem;">
+  <form method="POST" style="display:grid; gap:1.25rem;">
+    <div>
+      <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.35rem;">Current academic year</h2>
+      <p style="margin:0 0 0.75rem; font-size:0.8rem; color:var(--ink-muted);">
+        Shared by every student. Same control as the sidebar year switcher — changing either updates the lab year for everyone.
+      </p>
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted); display:block;">
+        Current year
+        <select class="field" style="margin-top:0.35rem;" id="active_academic_year" name="active_academic_year">
+          {% for y in academic_years %}
+          <option value="{{ y }}" {% if y == settings.active_academic_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div>
+      <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.35rem;">Group size range</h2>
+      <p style="margin:0 0 0.75rem; font-size:0.8rem; color:var(--ink-muted);">Applies to student create-group and CSV imports (including the creator).</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+        <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+          Minimum
+          <input class="field" style="margin-top:0.35rem;" id="group_size_min" name="group_size_min" type="number" min="1" value="{{ settings.group_size_min }}" />
+        </label>
+        <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+          Maximum
+          <input class="field" style="margin-top:0.35rem;" id="group_size_max" name="group_size_max" type="number" min="1" value="{{ settings.group_size_max }}" />
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.35rem;">Award results</h2>
+      <p style="margin:0 0 0.75rem; font-size:0.8rem; color:var(--ink-muted);">
+        Vendors see Accepted / Rejected on their bids only after results are published. Until then, outcomes stay pending.
+      </p>
+      <label style="display:flex; align-items:flex-start; gap:0.55rem; font-size:0.875rem; cursor:pointer;">
+        <input type="checkbox" name="results_published" value="1" style="margin-top:0.2rem;" {% if settings.results_published %}checked{% endif %} />
+        <span>Publish award results to vendors</span>
+      </label>
+    </div>
+
+    <div>
       <button type="submit" class="btn btn-primary">Save settings</button>
     </div>
   </form>

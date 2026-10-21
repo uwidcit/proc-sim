@@ -26,18 +26,13 @@ class RFP(db.Model):
         self.timestamp = datetime.now()
 
     def get_json(self):
-        return {
-            'groupID': self.groupID,
-            'lotID': self.lotID,
-            'status': self.status,
-            'Type': self.deviceType,
-            'Screen Size & Resolution': self.resolution,
-            'Operating System(s)': self.os,
-            'CPU': self.cpu,
-            'Memory (RAM)': self.ram,
-            'Hard Drive': self.drive,
-            'Graphics': self.gpu,
-            'External Peripherals': self.peripherals,
-            'Features': self.features,
-            'I/O': self.io
+        from App.controllers.rfp import RFP_SPEC_CATEGORIES
+
+        payload = {
+            "groupID": self.groupID,
+            "lotID": self.lotID,
+            "status": self.status,
         }
+        for key, label in RFP_SPEC_CATEGORIES:
+            payload[label] = getattr(self, key, "") or ""
+        return payload

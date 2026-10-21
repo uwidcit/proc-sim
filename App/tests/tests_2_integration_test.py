@@ -60,7 +60,7 @@ class Workflow1IntegrationTests(unittest.TestCase):
             'labSize': "Medium, capable of having 20 machines",
             'numMachines': 0,
             'budget': 160000.00,
-            'academic_year': 2025,
+            'academic_year': 2026,
         },
         {
             'id': 2,
@@ -69,7 +69,7 @@ class Workflow1IntegrationTests(unittest.TestCase):
             'labSize': "Medium, capable of having 20 machines",
             'numMachines': 0,
             'budget': 110000.00,
-            'academic_year': 2025,
+            'academic_year': 2026,
         }
         ], lots_json)
 
@@ -117,7 +117,7 @@ class Workflow2IntegrationTests(unittest.TestCase):
             'id': 1,
             'groupName': "G1 TechNova Solution",
             'status': "requested",
-            'academic_year': 2025,
+            'academic_year': 2026,
         }, group.get_json())
 
         for member in members:
@@ -286,18 +286,17 @@ class Workflow5IntegrationTests(unittest.TestCase):
     def test_submit_rfp_details(self):
         lotID = 1
         groupID = 1
-        # Ensure lot specs exist even if prior tests ran out of order
-        edit_lotRFP_details(
+        existing = get_rfp(groupID, lotID)
+        if existing:
+            remove_rfp(groupID, lotID)
+
+        rfp = create_rfp(
+            groupID,
             lotID,
             deviceType="Workstation/Laptop/Tablet",
             os="Mac/Windows/Android/IOS/Linux/Chromium",
             cpu="Core and frequency range eg (quad-core @ 2.2 - 3.0 GHz)",
         )
-        existing = get_rfp(groupID, lotID)
-        if existing:
-            remove_rfp(groupID, lotID)
-
-        rfp = create_rfp(groupID, lotID)
 
         rfp = get_rfp(groupID, lotID)
         assert rfp.deviceType == "Workstation/Laptop/Tablet"
@@ -323,16 +322,16 @@ class Workflow5IntegrationTests(unittest.TestCase):
         assert again.lotID == rfp.lotID
 
         lotID = 2
-        edit_lotRFP_details(
+        if get_rfp(groupID, lotID):
+            remove_rfp(groupID, lotID)
+
+        rfp = create_rfp(
+            groupID,
             lotID,
             drive="HDD/SSD, speed and capacity range, (list if secondary storage)",
             gpu="Integrated/Dedicated with memory range",
             features="Touch screen, WIFI version, bluetooth, Capture Card, Integrated Speakers, Integrated Webcam, Fingerprint reader, LTE",
         )
-        if get_rfp(groupID, lotID):
-            remove_rfp(groupID, lotID)
-
-        rfp = create_rfp(groupID, lotID)
         assert rfp
 
         rfp = get_rfp(groupID, lotID)

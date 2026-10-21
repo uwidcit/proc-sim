@@ -39,6 +39,16 @@ def ensure_schema_columns():
     _add("group", f"academic_year INTEGER NOT NULL DEFAULT {DEFAULT_ACADEMIC_YEAR}")
     _add("lot", f"academic_year INTEGER NOT NULL DEFAULT {DEFAULT_ACADEMIC_YEAR}")
     _add("lot", "numMachines INTEGER NOT NULL DEFAULT 0")
+    _add("bid", "message TEXT NOT NULL DEFAULT ''")
+    _add(
+        "app_setting",
+        f"active_academic_year INTEGER NOT NULL DEFAULT {DEFAULT_ACADEMIC_YEAR}",
+    )
+    _add(
+        "student",
+        f"academic_year INTEGER NOT NULL DEFAULT {DEFAULT_ACADEMIC_YEAR}",
+    )
+    _add("app_setting", "results_published BOOLEAN NOT NULL DEFAULT 0")
 
     if altered:
         db.session.commit()

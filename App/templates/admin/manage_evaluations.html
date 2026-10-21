@@ -14,6 +14,19 @@
       >{{ client.name }} ({{ client.count }})</button>
       {% endfor %}
       <span style="flex:1"></span>
+      <form method="POST" action="{{ url_for('admin_views.admin_publish_results') }}" style="display:flex; align-items:center; gap:0.5rem; margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <input type="hidden" name="next" value="{{ url_for('admin_views.admin_manage_evaluations') }}" />
+        {% if results_published %}
+        <input type="hidden" name="results_published" value="0" />
+        <span class="badge badge-ok">Results published</span>
+        <button type="submit" class="btn btn-secondary">Hide from vendors</button>
+        {% else %}
+        <input type="hidden" name="results_published" value="1" />
+        <span class="badge badge-pending">Results hidden</span>
+        <button type="submit" class="btn btn-primary">Publish results</button>
+        {% endif %}
+      </form>
       <span style="font-size:0.8rem; color:var(--ink-muted);">
         <strong style="color:var(--ink);" id="evalVisibleCount">{{ evaluation_groups|length }}</strong> shown
         · <strong style="color:var(--ink);">{{ evaluation_groups|length }}</strong> selected
@@ -354,15 +367,15 @@
 
   const RFP_FIELDS = [
     ['deviceType', 'Device type'],
-    ['resolution', 'Screen / resolution'],
+    ['resolution', 'Screen size & resolution'],
     ['os', 'Operating system(s)'],
     ['cpu', 'CPU'],
     ['ram', 'Memory (RAM)'],
-    ['drive', 'Hard drive'],
+    ['drive', 'Hard drive / storage'],
     ['gpu', 'Graphics'],
-    ['io', 'I/O ports'],
-    ['peripherals', 'Peripherals'],
-    ['features', 'Special features'],
+    ['peripherals', 'External peripherals'],
+    ['features', 'Features'],
+    ['io', 'I/O'],
   ];
 
   function csrfToken() {

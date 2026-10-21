@@ -55,8 +55,12 @@
       </div>
       {% block sidebar_nav %}
       <nav class="shell-nav">
+        <p class="shell-nav-label">Academic Year</p>
+        <p style="margin:0 0 0.75rem; padding:0 0.15rem; font-size:0.9rem; font-weight:650; color:var(--ink);">
+          {{ active_academic_year }}
+        </p>
         <p class="shell-nav-label">Group</p>
-        <a class="nav-link {% if active_page == 'create-group' %}is-active{% endif %}" href="{{ url_for('student_views.student_create_group_page') }}">Create Group</a>
+        <a class="nav-link {% if active_page == 'create-group' %}is-active{% endif %}" href="{{ url_for('student_views.student_create_group_page') }}">Group Request</a>
         <a class="nav-link {% if active_page == 'group-details' %}is-active{% endif %}" href="{{ url_for('student_views.student_group_details_page') }}">Group Details</a>
 
         <p class="shell-nav-label">Client</p>

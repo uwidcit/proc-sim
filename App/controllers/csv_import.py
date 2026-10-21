@@ -85,13 +85,16 @@ def parse_groups_csv(file_storage):
             f"Not enough unassigned lots for auto-approve. Need {needed}, found {free_count}."
         ]
 
-    # Conflict checks against existing users
+    year = get_current_year()
+    # Conflict checks against existing users (email unique within year)
     for gname, members in groups.items():
         for m in members:
             if db.session.scalars(db.select(Student).filter_by(username=m["student_id"])).first():
                 errors.append(f"Student ID {m['student_id']} already exists")
-            if db.session.scalars(db.select(Student).filter_by(email=m["email"])).first():
-                errors.append(f"Email {m['email']} already exists")
+            if db.session.scalars(
+                db.select(Student).filter_by(email=m["email"], academic_year=year)
+            ).first():
+                errors.append(f"Email {m['email']} already exists for {year}")
 
     if errors:
         return None, errors
@@ -121,7 +124,13 @@ def import_groups_from_csv(file_storage):
 
             for m in members:
                 password = _generate_password()
-                student = Student(m["name"], m["student_id"], password, email=m["email"])
+                student = Student(
+                    m["name"],
+                    m["student_id"],
+                    password,
+                    email=m["email"],
+                    academic_year=year,
+                )
                 db.session.add(student)
                 db.session.flush()
                 db.session.add(StudentGroup(student.id, group.id))

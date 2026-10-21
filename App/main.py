@@ -64,11 +64,16 @@ def create_app(overrides=None):
     @app.context_processor
     def inject_academic_year():
         try:
-            from App.controllers.academic_year import get_academic_years, get_current_year
+            from App.controllers.academic_year import (
+                get_academic_years,
+                get_current_year,
+                get_active_year,
+            )
 
             return dict(
                 academic_years=get_academic_years(),
                 current_academic_year=get_current_year(),
+                active_academic_year=get_active_year(),
             )
         except Exception:
             from App.academic_years import ACADEMIC_YEARS, DEFAULT_ACADEMIC_YEAR
@@ -76,6 +81,7 @@ def create_app(overrides=None):
             return dict(
                 academic_years=list(ACADEMIC_YEARS),
                 current_academic_year=DEFAULT_ACADEMIC_YEAR,
+                active_academic_year=DEFAULT_ACADEMIC_YEAR,
             )
 
     upload_dir = app.config.get("UPLOADED_PHOTOS_DEST", "App/uploads")

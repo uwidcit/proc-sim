@@ -13,7 +13,7 @@
 
   {% if status != "Confirmed" %}
   <p style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);">
-    Waiting for admin approval. Once approved, your group receives two exclusive lab lots.
+    Waiting for admin approval. You can edit the name and members until it is approved. Once approved, your group receives two exclusive lab lots.
   </p>
   {% endif %}
 
@@ -26,11 +26,13 @@
     {% endfor %}
   </ul>
 
-  {% if status == "Confirmed" %}
   <div class="btn-row-mobile" style="margin-top:1.25rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
+    {% if status != "Confirmed" %}
+    <a class="btn btn-primary" href="{{ url_for('student_views.student_edit_group_page') }}">Edit request</a>
+    {% else %}
     <a class="btn btn-primary" href="{{ url_for('student_views.student_lots_page') }}">Work on lots</a>
     <a class="btn btn-secondary" href="{{ url_for('student_views.rfp_gallery_page') }}">Browse RFP gallery</a>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 {% endblock %}

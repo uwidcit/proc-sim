@@ -28,6 +28,18 @@
       <button type="button" class="btn btn-primary child-screen-open" id="openEvalScreen">Evaluate</button>
     </div>
 
+    {% if bid.message %}
+    <div class="surface bid-message-panel">
+      <div class="bid-doc-header">
+        <div style="min-width:0;">
+          <div class="font-heading" style="font-weight:700; font-size:0.85rem;">Cover message</div>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:0.15rem;">From {{ bid.vendor_name }}</div>
+        </div>
+      </div>
+      <div class="rich-text-content">{{ bid.message|safe }}</div>
+    </div>
+    {% endif %}
+
     <div class="surface bid-doc-panel">
       <div class="bid-doc-header">
         <div style="min-width:0;">
@@ -72,13 +84,18 @@
 
         <section class="surface bid-eval-card">
           <h3 class="bid-eval-section-title">Technical audit</h3>
+          <p class="bid-audit-hint">Check each RFP category the bid satisfies. Requirements below match your submitted RFP.</p>
           <div class="bid-audit-list">
             {% for key, label in technical_specs %}
-            {% set is_checked = existing and key in existing.specsSelected.split(',') %}
+            {% set is_checked = existing and existing.specsSelected and key in existing.specsSelected.split(',') %}
+            {% set req = rfp_requirements.get(key, '') %}
             <label class="bid-audit-item">
               <input type="checkbox" name="specs_selected" value="{{ key }}" {% if is_checked %}checked{% endif %} />
               <span class="bid-audit-fields">
                 <span class="bid-audit-label">{{ label }}</span>
+                <span class="bid-audit-requirement {% if not req %}is-empty{% endif %}">
+                  {% if req %}{{ req }}{% else %}Not specified in RFP{% endif %}
+                </span>
                 <input
                   class="bid-audit-comment"
                   type="text"
@@ -125,6 +142,10 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem 1.1rem 1.25rem !important;
+  overflow: auto;
+}
+.bid-message-panel {
+  flex-shrink: 0;
 }
 .bid-eval-toolbar {
   flex-shrink: 0;
@@ -206,6 +227,12 @@
   font-size: 0.75rem;
   color: var(--ink-muted);
 }
+.bid-audit-hint {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
 .bid-audit-list {
   display: flex;
   flex-direction: column;
@@ -234,13 +261,27 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.25rem;
 }
 .bid-audit-label {
   font-size: 0.8rem;
   font-weight: 650;
   color: var(--ink);
   line-height: 1.3;
+}
+.bid-audit-requirement {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-radius: 0.35rem;
+  padding: 0.3rem 0.45rem;
+  word-break: break-word;
+}
+.bid-audit-requirement.is-empty {
+  color: var(--ink-muted);
+  background: var(--paper);
+  font-style: italic;
 }
 .bid-audit-comment {
   width: 100%;

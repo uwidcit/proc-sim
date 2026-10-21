@@ -51,10 +51,10 @@ These passwords are for local/lab demos. Do not reuse in production.
 | Role | Username | Password |
 |------|----------|----------|
 | Admin | bob | bobpass |
-| Student (NexoraTech) | 20240001 | aidenpass |
-| Student (unassigned) | 20240031 | darrenpass |
+| Student 2024 (NexoraTech) | 20240001 | aidenpass |
+| Student 2026 (unassigned) | 20260001 | aidenpass |
 
-Seed creates exclusive lots and approved groups. See `App/controllers/initialize.py` for the full roster.
+Student accounts are year-specific. Group creation only lists students for the current year. Seed: 2024 full archive; 2025/2026 same lots + year-scoped students (no groups/RFPs/bids). Admin sets the current year in the sidebar or Settings (default 2026); it applies to all students.
 
 ## Admin: group size & CSV import
 

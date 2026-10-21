@@ -2,8 +2,24 @@ from App.models import Bid, Evaluation, Lot
 from App.database import db
 from .academic_year import get_current_year
 
-def create_bid(lotID, sourceGroupID, recipientGroupID, bidDocument, bidDocumentName, quotationAmount):
-    newbid = Bid(lotID, sourceGroupID, recipientGroupID, bidDocument, bidDocumentName, quotationAmount)
+def create_bid(
+    lotID,
+    sourceGroupID,
+    recipientGroupID,
+    bidDocument,
+    bidDocumentName,
+    quotationAmount,
+    message="",
+):
+    newbid = Bid(
+        lotID,
+        sourceGroupID,
+        recipientGroupID,
+        bidDocument,
+        bidDocumentName,
+        quotationAmount,
+        message=message,
+    )
     db.session.add(newbid)
     db.session.commit()
     return newbid

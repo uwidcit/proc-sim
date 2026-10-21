@@ -185,6 +185,7 @@ def admin_manage_bids():
                 "timestamp": format_timestamp(bid_obj.timestamp),
                 "filename": bid_obj.bidDocumentName,
                 "quotation": bid_obj.quotationAmount,
+                "message": bid_obj.message or "",
                 "pdf_url": url_for(
                     'admin_views.admin_view_bid_document',
                     group_id=group.id,
@@ -484,12 +485,15 @@ def _evaluation_compare_payload(evaluation, bid=None, lot=None, rfp=None, client
 @admin_views.route('/admin/manage-evaluations')
 @admin_required
 def admin_manage_evaluations():
+    from App.controllers.settings import are_results_published
+
     year = get_current_year()
     evaluations = db.session.scalars(
         db.select(Evaluation)
         .join(Lot, Lot.id == Evaluation.lotID)
         .filter(Lot.academic_year == year, Evaluation.status == "selected")
     ).all()
+    results_published = are_results_published()
 
     evaluation_groups = []
     client_counts = {}
@@ -546,6 +550,7 @@ def admin_manage_evaluations():
         client_filters=list(client_counts.values()),
         title='Manage Evaluations',
         active_page='evaluations',
+        results_published=results_published,
     )
 
 @admin_views.route('/admin/manage-evaluations/<int:evaluationID>/remove', methods=['POST'])
@@ -568,15 +573,24 @@ def admin_remove_evaluation(evaluationID):
 @admin_required
 def admin_settings():
     if request.method == 'POST':
-        settings, err = update_group_size_range(
+        from App.controllers.settings import update_settings
+        from App.controllers.academic_year import set_current_year
+
+        settings, err = update_settings(
             request.form.get('group_size_min'),
             request.form.get('group_size_max'),
+            active_year=request.form.get('active_academic_year'),
+            results_published=request.form.get('results_published') == '1',
         )
         if err:
             flash(err, "failed")
         else:
+            set_current_year(settings.active_academic_year)
+            publish_label = "published" if settings.results_published else "hidden"
             flash(
-                f"Group size range updated to {settings.group_size_min}-{settings.group_size_max}",
+                f"Settings saved — year {settings.active_academic_year}; "
+                f"group size {settings.group_size_min}-{settings.group_size_max}; "
+                f"award results {publish_label}",
                 "success",
             )
         return redirect(url_for('admin_views.admin_settings'))
@@ -589,6 +603,21 @@ def admin_settings():
         settings=settings,
         free_lots=count_unassigned_lots(),
     )
+
+
+@admin_views.route('/admin/publish-results', methods=['POST'])
+@admin_required
+def admin_publish_results():
+    from App.controllers.settings import set_results_published
+
+    publish = request.form.get('results_published') == '1'
+    set_results_published(publish)
+    if publish:
+        flash("Award results are now visible to vendors", "success")
+    else:
+        flash("Award results are hidden from vendors again", "info")
+    next_url = request.form.get('next') or url_for('admin_views.admin_manage_evaluations')
+    return redirect(next_url)
 
 
 @admin_views.route('/admin/import-groups', methods=['GET', 'POST'])

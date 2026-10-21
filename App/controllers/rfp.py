@@ -10,6 +10,32 @@ RFP_FIELDS = (
     "gpu", "peripherals", "features", "io",
 )
 
+# Canonical RFP / technical-audit categories (key, label) — keep in sync with Create RFP form
+RFP_SPEC_CATEGORIES = (
+    ("deviceType", "Device type"),
+    ("resolution", "Screen size & resolution"),
+    ("os", "Operating system(s)"),
+    ("cpu", "CPU"),
+    ("ram", "Memory (RAM)"),
+    ("drive", "Hard drive / storage"),
+    ("gpu", "Graphics"),
+    ("peripherals", "External peripherals"),
+    ("features", "Features"),
+    ("io", "I/O"),
+)
+
+RFP_SPEC_LABELS = dict(RFP_SPEC_CATEGORIES)
+
+
+def rfp_specs_dict(rfp):
+    """Map an RFP (or similar) to {field: value} for all audit categories."""
+    if not rfp:
+        return {key: "" for key, _ in RFP_SPEC_CATEGORIES}
+    return {
+        key: (getattr(rfp, key, None) or "")
+        for key, _ in RFP_SPEC_CATEGORIES
+    }
+
 
 def _apply_specs(rfp, specs):
     for field in RFP_FIELDS:
@@ -23,10 +49,7 @@ def create_rfp(groupID, lotID, status="draft", **specs):
         return existing
 
     rfp = RFP(groupID, lotID)
-    lot = get_lot(lotID)
-    if lot:
-        for field in RFP_FIELDS:
-            setattr(rfp, field, getattr(lot, field, "") or "")
+    # Start blank; only apply explicitly provided specs (do not copy lot catalog)
     _apply_specs(rfp, specs)
     rfp.status = status
     db.session.add(rfp)
