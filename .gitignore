@@ -11,7 +11,9 @@ App/custom_config.py
 # C extensions
 *.so
 
-migrations/*
+# Keep Alembic migrations in git; ignore local runtime junk only
+migrations/__pycache__/
+migrations/versions/__pycache__/
 pytest-cache-files*/
 
 # Distribution / packaging
