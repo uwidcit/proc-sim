@@ -302,6 +302,7 @@ def admin_manage_groups():
         if not student.account_claimed:
             unclaimed_count += 1
         student_rows.append({
+            "id": student.id,
             "name": student.name,
             "student_id": student.username,
             "email": student.email or "",
@@ -318,6 +319,7 @@ def admin_manage_groups():
                          students=student_rows,
                          ungrouped_count=ungrouped_count,
                          unclaimed_count=unclaimed_count,
+                         academic_year=year,
                          active_page='groups')
 
 
@@ -339,6 +341,45 @@ def admin_import_class_list():
         f"Imported {count} ungrouped students. They can claim accounts with matching ID and email.",
         "success",
     )
+    return redirect(url_for('admin_views.admin_manage_groups'))
+
+
+@admin_views.route('/admin/manage-groups/students/<int:student_id>/edit', methods=['POST'])
+@admin_required
+def admin_edit_class_student(student_id):
+    student, err = update_student(
+        student_id,
+        name=request.form.get('name'),
+        username=request.form.get('student_id'),
+        email=request.form.get('email'),
+    )
+    if err:
+        flash(err, "failed")
+    else:
+        flash(f"Updated {student.name}", "success")
+    return redirect(url_for('admin_views.admin_manage_groups'))
+
+
+@admin_views.route('/admin/manage-groups/students/<int:student_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_class_student(student_id):
+    ok, err = delete_student(student_id)
+    if not ok:
+        flash(err or "Could not delete student", "failed")
+    else:
+        flash("Student removed from the class list", "success")
+    return redirect(url_for('admin_views.admin_manage_groups'))
+
+
+@admin_views.route('/admin/manage-groups/students/delete-all', methods=['POST'])
+@admin_required
+def admin_delete_all_class_students():
+    year = get_current_year()
+    count = delete_all_students_for_year(year)
+    if count:
+        flash(f"Removed {count} students from the {year} class list", "success")
+    else:
+        flash(f"No students to remove for {year}", "info")
     return redirect(url_for('admin_views.admin_manage_groups'))
 
 

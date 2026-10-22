@@ -16,11 +16,23 @@
 </div>
 
 <section style="margin-bottom:1.5rem;">
-  <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.65rem;">Class list</h2>
-  <p style="margin:0 0 0.85rem; font-size:0.8rem; color:var(--ink-muted); line-height:1.45;">
-    Upload ungrouped students (<code>student_id,name,email</code>).
-    Students claim their account at registration by matching ID and email.
-  </p>
+  <div style="display:flex; flex-wrap:wrap; align-items:end; gap:0.65rem 1rem; margin-bottom:0.65rem;">
+    <div style="flex:1; min-width:12rem;">
+      <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.35rem;">Class list · {{ academic_year }}</h2>
+      <p style="margin:0; font-size:0.8rem; color:var(--ink-muted); line-height:1.45;">
+        Only students for the current year. Upload CSV (<code>student_id,name,email</code>);
+        they claim accounts by matching ID and email.
+      </p>
+    </div>
+    {% if students %}
+    <button
+      type="button"
+      class="btn btn-danger delete-all-students-btn"
+      data-year="{{ academic_year }}"
+      data-count="{{ students|length }}"
+    >Delete all</button>
+    {% endif %}
+  </div>
   <form
     method="POST"
     action="{{ url_for('admin_views.admin_import_class_list') }}"
@@ -45,6 +57,7 @@
           <th>Email</th>
           <th>Account</th>
           <th>Group</th>
+          <th class="is-center">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -68,12 +81,30 @@
               <span style="color:var(--ink-muted);">Ungrouped</span>
               {% endif %}
             </td>
+            <td class="is-center">
+              <div style="display:inline-flex; gap:0.35rem; flex-wrap:wrap; justify-content:center;">
+                <button
+                  type="button"
+                  class="btn btn-secondary edit-student-btn"
+                  data-id="{{ s.id }}"
+                  data-name="{{ s.name|e }}"
+                  data-student-id="{{ s.student_id|e }}"
+                  data-email="{{ s.email|e }}"
+                >Edit</button>
+                <button
+                  type="button"
+                  class="btn btn-danger delete-student-btn"
+                  data-id="{{ s.id }}"
+                  data-name="{{ s.name|e }}"
+                >Delete</button>
+              </div>
+            </td>
           </tr>
           {% endfor %}
         {% else %}
           <tr>
-            <td colspan="5" style="color:var(--ink-muted); padding:1.25rem;">
-              No students for this year yet. Upload a class list to get started.
+            <td colspan="6" style="color:var(--ink-muted); padding:1.25rem;">
+              No students for {{ academic_year }} yet. Upload a class list to get started.
             </td>
           </tr>
         {% endif %}
@@ -164,6 +195,31 @@
   </div>
 </div>
 
+<div id="editStudentModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="padding:1.25rem; max-width:24rem; width:calc(100% - 2rem);">
+    <h3 class="font-heading" style="margin:0 0 0.85rem; font-size:1.05rem;">Edit student</h3>
+    <form id="editStudentForm" method="POST" style="display:flex; flex-direction:column; gap:0.75rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Full name
+        <input class="field" style="margin-top:0.35rem;" type="text" name="name" id="editStudentName" required maxlength="100" />
+      </label>
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Student ID
+        <input class="field" style="margin-top:0.35rem;" type="text" name="student_id" id="editStudentId" required maxlength="20" />
+      </label>
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Email
+        <input class="field" style="margin-top:0.35rem;" type="email" name="email" id="editStudentEmail" required maxlength="120" />
+      </label>
+      <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.25rem;">
+        <button type="button" class="btn btn-secondary" onclick="hideEditStudentModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 let pendingForm = null;
 let pendingToggle = null;
@@ -182,6 +238,9 @@ function hideConfirmModal() {
   pendingForm = null;
   pendingToggle = null;
   document.getElementById('confirmModal').style.display = 'none';
+}
+function hideEditStudentModal() {
+  document.getElementById('editStudentModal').style.display = 'none';
 }
 function csrfInput() {
   const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -232,6 +291,45 @@ window.addEventListener('DOMContentLoaded', function () {
       form.action = `/admin/groups/${e.target.dataset.groupId}/remove`;
       form.appendChild(csrfInput());
       showConfirmModal('Remove group?', 'Permanently removes the group and related data.', form);
+    });
+  });
+  document.querySelectorAll('.edit-student-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const el = e.currentTarget;
+      const form = document.getElementById('editStudentForm');
+      form.action = `/admin/manage-groups/students/${el.dataset.id}/edit`;
+      document.getElementById('editStudentName').value = el.dataset.name || '';
+      document.getElementById('editStudentId').value = el.dataset.studentId || '';
+      document.getElementById('editStudentEmail').value = el.dataset.email || '';
+      document.getElementById('editStudentModal').style.display = 'flex';
+    });
+  });
+  document.querySelectorAll('.delete-student-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const el = e.currentTarget;
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `/admin/manage-groups/students/${el.dataset.id}/delete`;
+      form.appendChild(csrfInput());
+      showConfirmModal(
+        'Delete student?',
+        `Removes ${el.dataset.name} from the {{ academic_year }} class list.`,
+        form
+      );
+    });
+  });
+  document.querySelectorAll('.delete-all-students-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const el = e.currentTarget;
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '{{ url_for("admin_views.admin_delete_all_class_students") }}';
+      form.appendChild(csrfInput());
+      showConfirmModal(
+        'Delete entire class list?',
+        `Permanently removes all ${el.dataset.count} students for ${el.dataset.year}. This cannot be undone.`,
+        form
+      );
     });
   });
   document.getElementById('confirmActionBtn').addEventListener('click', function () {
