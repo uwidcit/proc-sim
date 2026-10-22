@@ -48,9 +48,10 @@ def ensure_schema_columns():
         "student",
         f"academic_year INTEGER NOT NULL DEFAULT {DEFAULT_ACADEMIC_YEAR}",
     )
-    _add("app_setting", "results_published BOOLEAN NOT NULL DEFAULT 0")
+    # Postgres requires TRUE/FALSE for boolean defaults (not 0/1)
+    _add("app_setting", "results_published BOOLEAN NOT NULL DEFAULT FALSE")
     # Existing students are treated as already claimed
-    _add("student", "account_claimed BOOLEAN NOT NULL DEFAULT 1")
+    _add("student", "account_claimed BOOLEAN NOT NULL DEFAULT TRUE")
 
     if altered:
         db.session.commit()
