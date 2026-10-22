@@ -107,6 +107,8 @@ def _group_form_candidates(year, selected_ids=None, exclude_group_id=None):
     for student in students:
         if student.id == current_user.id:
             continue
+        if not student.account_claimed and student.id not in selected_ids:
+            continue
         if student.id in taken_ids and student.id not in selected_ids:
             continue
         candidates.append({

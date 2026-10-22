@@ -49,6 +49,8 @@ def ensure_schema_columns():
         f"academic_year INTEGER NOT NULL DEFAULT {DEFAULT_ACADEMIC_YEAR}",
     )
     _add("app_setting", "results_published BOOLEAN NOT NULL DEFAULT 0")
+    # Existing students are treated as already claimed
+    _add("student", "account_claimed BOOLEAN NOT NULL DEFAULT 1")
 
     if altered:
         db.session.commit()

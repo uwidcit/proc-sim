@@ -59,6 +59,16 @@ Student accounts are year-specific. Group creation only lists students for the c
 ## Admin: group size & CSV import
 
 - **Settings** (`/admin/settings`): configure `group_size_min` / `group_size_max`.
+- **Manage Groups** (`/admin/manage-groups`): student listing table + upload class list of ungrouped students:
+
+```text
+student_id,name,email
+20249901,Ada Lovelace,ada@lab.local
+20249902,Alan Turing,alan@lab.local
+```
+
+Students then **claim** their account at `/register` by matching `student_id` + `email`. Unclaimed roster rows cannot log in.
+
 - **Import Groups** (`/admin/import-groups`): upload CSV with headers:
 
 ```text
@@ -107,6 +117,21 @@ flask init
 ```
 
 `flask init` **resets** the database — only run on a fresh deploy.
+
+### Redeploy from your machine
+
+1. Put the EasyPanel **Deploy webhook** URL in `.env`:
+
+```env
+EASYPANEL_DEPLOY_WEBHOOK=http://YOUR_HOST:3000/api/deploy/YOUR_TOKEN
+```
+
+2. Trigger a rebuild/redeploy:
+
+```bash
+python scripts/deploy.py
+# or: scripts/deploy.ps1   /   bash scripts/deploy.sh
+```
 
 ### Option B — App + managed Postgres
 

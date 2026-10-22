@@ -11,6 +11,7 @@ from .academic_year import get_current_year
 
 
 REQUIRED_HEADERS = {"student_id", "name", "email", "group_name"}
+CLASS_LIST_HEADERS = {"student_id", "name", "email"}
 
 
 def _generate_password(length=12):
@@ -18,28 +19,40 @@ def _generate_password(length=12):
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def parse_groups_csv(file_storage):
-    """Parse and validate CSV. Returns (groups_dict, errors)."""
+def _read_csv_rows(file_storage, required_headers):
+    """Return (field_map, rows_iter, errors). rows_iter yields (line_no, row_dict)."""
     raw = file_storage.read()
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(raw))
     if not reader.fieldnames:
-        return None, ["CSV has no header row"]
+        return None, None, ["CSV has no header row"]
 
     headers = {h.strip().lower() for h in reader.fieldnames if h}
-    missing = REQUIRED_HEADERS - headers
+    missing = required_headers - headers
     if missing:
-        return None, [f"Missing required columns: {', '.join(sorted(missing))}"]
+        return None, None, [f"Missing required columns: {', '.join(sorted(missing))}"]
 
     field_map = {h.strip().lower(): h for h in reader.fieldnames if h}
+
+    def rows():
+        for i, row in enumerate(reader, start=2):
+            yield i, row
+
+    return field_map, rows(), []
+
+
+def parse_groups_csv(file_storage):
+    """Parse and validate CSV. Returns (groups_dict, errors)."""
+    field_map, rows, errors = _read_csv_rows(file_storage, REQUIRED_HEADERS)
+    if errors:
+        return None, errors
 
     groups = defaultdict(list)
     seen_ids = set()
     seen_emails = set()
-    errors = []
 
-    for i, row in enumerate(reader, start=2):
+    for i, row in rows:
         student_id = (row.get(field_map["student_id"]) or "").strip()
         name = (row.get(field_map["name"]) or "").strip()
         email = (row.get(field_map["email"]) or "").strip().lower()
@@ -100,6 +113,96 @@ def parse_groups_csv(file_storage):
         return None, errors
 
     return dict(groups), []
+
+
+def parse_class_list_csv(file_storage):
+    """Parse ungrouped class-list CSV. Returns (students_list, errors)."""
+    field_map, rows, errors = _read_csv_rows(file_storage, CLASS_LIST_HEADERS)
+    if errors:
+        return None, errors
+
+    students = []
+    seen_ids = set()
+    seen_emails = set()
+
+    for i, row in rows:
+        student_id = (row.get(field_map["student_id"]) or "").strip()
+        name = (row.get(field_map["name"]) or "").strip()
+        email = (row.get(field_map["email"]) or "").strip().lower()
+
+        if not all([student_id, name, email]):
+            errors.append(f"Row {i}: student_id, name, and email are required")
+            continue
+        if " " in student_id:
+            errors.append(f"Row {i}: student_id cannot contain spaces")
+            continue
+        if len(student_id) > 20:
+            errors.append(f"Row {i}: student_id must be 20 characters or fewer")
+            continue
+        if "@" not in email or len(email) > 120:
+            errors.append(f"Row {i}: invalid email")
+            continue
+        if student_id in seen_ids:
+            errors.append(f"Row {i}: duplicate student_id {student_id}")
+            continue
+        if email in seen_emails:
+            errors.append(f"Row {i}: duplicate email {email}")
+            continue
+        seen_ids.add(student_id)
+        seen_emails.add(email)
+        students.append({
+            "student_id": student_id,
+            "name": name,
+            "email": email,
+        })
+
+    if errors:
+        return None, errors
+    if not students:
+        return None, ["CSV has no student rows"]
+
+    year = get_current_year()
+    for m in students:
+        if db.session.scalars(db.select(Student).filter_by(username=m["student_id"])).first():
+            errors.append(f"Student ID {m['student_id']} already exists")
+        if db.session.scalars(
+            db.select(Student).filter_by(email=m["email"], academic_year=year)
+        ).first():
+            errors.append(f"Email {m['email']} already exists for {year}")
+
+    if errors:
+        return None, errors
+
+    return students, []
+
+
+def import_class_list_from_csv(file_storage):
+    """
+    Import ungrouped, unclaimed student roster entries.
+    Students claim accounts later via register (id + email match).
+    Returns (count, errors).
+    """
+    students, errors = parse_class_list_csv(file_storage)
+    if errors:
+        return None, errors
+
+    try:
+        year = get_current_year()
+        for m in students:
+            student = Student(
+                m["name"],
+                m["student_id"],
+                _generate_password(),
+                email=m["email"],
+                academic_year=year,
+                account_claimed=False,
+            )
+            db.session.add(student)
+        db.session.commit()
+        return len(students), []
+    except Exception as e:
+        db.session.rollback()
+        return None, [str(e)]
 
 
 def import_groups_from_csv(file_storage):

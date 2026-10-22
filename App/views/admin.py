@@ -241,6 +241,8 @@ def admin_manage_groups():
         db.select(Group).filter_by(academic_year=year)
     ).all()
 
+    group_name_by_student = {}
+
     for group in groups:
         dic = {}
         dic["id"] = group.id
@@ -258,6 +260,7 @@ def admin_manage_groups():
             member["name"] = student.name
             member["id"] = student.username
             members.append(member)
+            group_name_by_student[student.id] = group.groupName
 
         dic["members"] = members
 
@@ -283,13 +286,60 @@ def admin_manage_groups():
         .where(Lot.academic_year == year, LotGroup.lotID == None)
     ).all()
 
+    year_students = db.session.scalars(
+        db.select(Student)
+        .filter_by(academic_year=year)
+        .order_by(Student.name)
+    ).all()
+
+    student_rows = []
+    ungrouped_count = 0
+    unclaimed_count = 0
+    for student in year_students:
+        group_name = group_name_by_student.get(student.id)
+        if not group_name:
+            ungrouped_count += 1
+        if not student.account_claimed:
+            unclaimed_count += 1
+        student_rows.append({
+            "name": student.name,
+            "student_id": student.username,
+            "email": student.email or "",
+            "claimed": bool(student.account_claimed),
+            "group": group_name,
+        })
+
     return render_template('admin/manage_groups.html',
                          tab='requests',
                          title='Manage Groups',
                          group_requests=GROUP_REQUESTS,
                          groups=GROUPS,
                          lots=LOTS,
+                         students=student_rows,
+                         ungrouped_count=ungrouped_count,
+                         unclaimed_count=unclaimed_count,
                          active_page='groups')
+
+
+@admin_views.route('/admin/manage-groups/import-class-list', methods=['POST'])
+@admin_required
+def admin_import_class_list():
+    file = request.files.get('csv_file')
+    if not file or not file.filename:
+        flash("Please upload a CSV file", "failed")
+        return redirect(url_for('admin_views.admin_manage_groups'))
+
+    count, errors = import_class_list_from_csv(file)
+    if errors:
+        for err in errors:
+            flash(err, "failed")
+        return redirect(url_for('admin_views.admin_manage_groups'))
+
+    flash(
+        f"Imported {count} ungrouped students. They can claim accounts with matching ID and email.",
+        "success",
+    )
+    return redirect(url_for('admin_views.admin_manage_groups'))
 
 
 @admin_views.route('/admin/groups/<int:group_id>/remove', methods=['POST'])

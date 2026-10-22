@@ -3,7 +3,14 @@ from App.database import db
 from .academic_year import get_current_year, get_active_year
 
 
-def create_student(name, username, password, email=None, academic_year=None):
+def create_student(
+    name,
+    username,
+    password,
+    email=None,
+    academic_year=None,
+    account_claimed=True,
+):
     if academic_year is None:
         academic_year = get_active_year()
     newstudent = Student(
@@ -12,6 +19,7 @@ def create_student(name, username, password, email=None, academic_year=None):
         password=password,
         email=email,
         academic_year=academic_year,
+        account_claimed=account_claimed,
     )
     db.session.add(newstudent)
     db.session.commit()
@@ -20,7 +28,8 @@ def create_student(name, username, password, email=None, academic_year=None):
 
 def register_student(name, student_id, password, confirm_password, email=None):
     """
-    Public self-serve student signup for the active working year.
+    Claim a rostered (unclaimed) student account for the active working year.
+    student_id + email must match an unclaimed class-list entry.
     Returns (student, None) on success or (None, error_message) on failure.
     """
     name = (name or "").strip()
@@ -40,24 +49,39 @@ def register_student(name, student_id, password, confirm_password, email=None):
         return None, "Student ID must be 20 characters or fewer"
     if " " in student_id:
         return None, "Student ID cannot contain spaces"
-    if email and ("@" not in email or len(email) > 120):
+    if not email:
+        return None, "Email is required to claim your account"
+    if "@" not in email or len(email) > 120:
         return None, "Enter a valid email address"
     if len(password) < 6:
         return None, "Password must be at least 6 characters"
     if password != confirm_password:
         return None, "Passwords do not match"
 
-    if db.session.scalars(db.select(User).filter_by(username=student_id)).first():
-        return None, "That student ID is already registered"
-    if email and db.session.scalars(
-        db.select(Student).filter_by(email=email, academic_year=year)
-    ).first():
-        return None, "That email is already registered for this year"
+    existing = db.session.scalars(
+        db.select(Student).filter_by(username=student_id)
+    ).first()
 
-    student = create_student(
-        name, student_id, password, email=email, academic_year=year
-    )
-    return student, None
+    if not existing:
+        return None, (
+            "Student ID is not on the class list. Ask your instructor to add you."
+        )
+
+    if existing.academic_year != year:
+        return None, "That student ID belongs to a different academic year"
+
+    if existing.account_claimed:
+        return None, "That student ID is already registered"
+
+    roster_email = (existing.email or "").strip().lower()
+    if not roster_email or roster_email != email:
+        return None, "Student ID and email do not match the class list"
+
+    existing.name = name
+    existing.set_password(password)
+    existing.account_claimed = True
+    db.session.commit()
+    return existing, None
 
 
 def get_student(id):

@@ -39,7 +39,7 @@ def register_page():
             )
 
         user, token, role = login(student.username, request.form.get('password'))
-        flash("Account created. Welcome!", "success")
+        flash("Account claimed. Welcome!", "success")
         response = redirect('/student')
         set_access_cookies(response, token)
         return response

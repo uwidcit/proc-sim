@@ -1,15 +1,18 @@
 from flask_jwt_extended import create_access_token, jwt_required, JWTManager, get_jwt_identity, verify_jwt_in_request
 
-from App.models import User
+from App.models import User, Student
 from App.database import db
 
 def login(username, password):
   result = db.session.execute(db.select(User).filter_by(username=username))
   user = result.scalar_one_or_none()
-  if user and user.check_password(password):
-    # Store ONLY the user id as a string in JWT 'sub'
-    return user, create_access_token(identity=str(user.id)), user.type
-  return None, None, None
+  if not user or not user.check_password(password):
+    return None, None, None
+  # Roster placeholders cannot sign in until claimed via /register
+  if isinstance(user, Student) and not user.account_claimed:
+    return None, None, None
+  # Store ONLY the user id as a string in JWT 'sub'
+  return user, create_access_token(identity=str(user.id)), user.type
 
 
 def setup_jwt(app):
