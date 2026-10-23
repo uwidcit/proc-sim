@@ -138,7 +138,7 @@
         <input class="field" style="margin-top:0.35rem;" type="number" id="bid-amount" name="amount" min="0" step="0.01" placeholder="0.00" required />
       </label>
       <div>
-        <div style="font-size:0.75rem; font-weight:650; color:var(--ink-muted); margin-bottom:0.35rem;">Cover message <span style="font-weight:500;">(optional)</span></div>
+        <div style="font-size:0.75rem; font-weight:650; color:var(--ink-muted); margin-bottom:0.35rem;">Cover message</div>
         <div class="rich-editor">
           <div class="rich-editor-toolbar" role="toolbar" aria-label="Formatting">
             <button type="button" class="rich-editor-btn" data-cmd="bold" title="Bold"><b>B</b></button>
@@ -157,15 +157,28 @@
           ></div>
         </div>
       </div>
-      <div id="drop-zone" class="surface" style="padding:1.25rem; text-align:center; border-style:dashed; cursor:pointer;"
-        onclick="document.getElementById('bid-pdf').click()"
-        ondragover="event.preventDefault(); this.style.borderColor='var(--accent)';"
-        ondragleave="this.style.borderColor='';"
-        ondrop="handleDrop(event)">
-        <p id="drop-label" style="margin:0; font-size:0.85rem; font-weight:600;">Drag &amp; drop PDF, or click to browse</p>
-        <p style="margin:0.35rem 0 0; font-size:0.75rem; color:var(--ink-muted);">PDF only, max 5MB</p>
+      <div>
+        <div style="font-size:0.75rem; font-weight:650; color:var(--ink-muted); margin-bottom:0.35rem;">Bid document (PDF)</div>
+        <p style="margin:0 0 0.5rem; font-size:0.8rem; color:var(--ink-muted); line-height:1.45;">
+          Use the
+          <a
+            href="https://docs.google.com/document/d/19VU4z4FRMDVPXS2U_nAyQufJQemBe4-IVH7DWAKo9gU/edit?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="color:var(--accent-ink); font-weight:650; text-decoration:none;"
+          >bid document template</a>
+          (File → Download → PDF), then upload below.
+        </p>
+        <div id="drop-zone" class="surface" style="padding:1.25rem; text-align:center; border-style:dashed; cursor:pointer;"
+          onclick="document.getElementById('bid-pdf').click()"
+          ondragover="event.preventDefault(); this.style.borderColor='var(--accent)';"
+          ondragleave="this.style.borderColor='';"
+          ondrop="handleDrop(event)">
+          <p id="drop-label" style="margin:0; font-size:0.85rem; font-weight:600;">Drag &amp; drop PDF, or click to browse</p>
+          <p style="margin:0.35rem 0 0; font-size:0.75rem; color:var(--ink-muted);">PDF only, max 5MB</p>
+        </div>
+        <input type="file" id="bid-pdf" name="pdf" accept="application/pdf" style="display:none;" onchange="handleFileSelect(this)" />
       </div>
-      <input type="file" id="bid-pdf" name="pdf" accept="application/pdf" style="display:none;" onchange="handleFileSelect(this)" />
       <div class="btn-row-end" style="display:flex; justify-content:flex-end; gap:0.5rem; padding-top:0.5rem; border-top:1px solid var(--line);">
         <button type="button" class="btn btn-secondary" onclick="hideBidModal()">Close</button>
         <button type="button" class="btn btn-primary" onclick="submitBid()">Submit bid</button>
@@ -239,6 +252,8 @@ document.querySelectorAll('.rich-editor-btn').forEach(function (btn) {
 function submitBid() {
   const pdf = document.getElementById('bid-pdf');
   const amount = document.getElementById('bid-amount').value;
+  const editor = document.getElementById('bid-message-editor');
+  const messageText = (editor.innerText || editor.textContent || '').trim();
   if (!pdf.files || pdf.files.length === 0) {
     document.getElementById('drop-label').textContent = 'Please attach a PDF before submitting';
     return;
@@ -247,7 +262,12 @@ function submitBid() {
     alert('Please enter a valid quotation amount.');
     return;
   }
-  document.getElementById('bid-message').value = document.getElementById('bid-message-editor').innerHTML;
+  if (!messageText) {
+    alert('Please enter a cover message.');
+    editor.focus();
+    return;
+  }
+  document.getElementById('bid-message').value = editor.innerHTML;
   document.getElementById('placeBidForm').submit();
 }
 </script>

@@ -769,6 +769,9 @@ def rfp_gallery_page():
 
         lot = get_lot(lotID)
         message = sanitize_rich_text(request.form.get("message"))
+        if not message:
+            flash("Cover message is required", "failed")
+            return redirect(url_for('student_views.rfp_gallery_page'))
         create_bid(
             lotID,
             yourGroup.id,

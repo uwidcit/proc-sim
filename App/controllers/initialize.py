@@ -1,6 +1,6 @@
 from App.controllers.studentGroup import add_studentGroup
 from App.database import db
-from .lot import create_lot
+from .lot import create_lot, get_lot
 from .labType import create_lab_type
 from .student import create_student
 from .admin import create_admin
@@ -18,6 +18,11 @@ from App.models import *
 TEST_GROUP_DEFS = (
     ("AlphaLab", (1, 2, 3)),
     ("BetaLab", (4, 5, 6)),
+)
+# Extra 2025 vendors so RFPs can receive multiple competing bids
+SEED_2025_EXTRA_GROUPS = (
+    ("GammaLab", (7, 8, 9)),
+    ("DeltaLab", (10, 11, 12)),
 )
 
 
@@ -317,13 +322,14 @@ def initialize():
                 account_claimed=True,
             )
 
-    def _seed_test_groups(year):
+    def _seed_test_groups(year, group_defs=None):
         """
-        Ensure the six demo students exist, then two approved groups of three.
-        Students are created here (not only earlier) so open years never end up
-        with empty AlphaLab/BetaLab shells.
+        Ensure roster students for group_defs exist, then approved groups of three.
+        Returns {group_name: Group}.
         """
-        test_roster = [row for row in student_roster if row[1] in (1, 2, 3, 4, 5, 6)]
+        group_defs = group_defs or TEST_GROUP_DEFS
+        needed_seqs = {seq for _name, seqs in group_defs for seq in seqs}
+        test_roster = [row for row in student_roster if row[1] in needed_seqs]
         for name, seq, password, email_local in test_roster:
             username = f"{year}{seq:04d}"
             existing = db.session.scalars(
@@ -343,8 +349,8 @@ def initialize():
                 account_claimed=True,
             )
 
-        for group_name, seqs in TEST_GROUP_DEFS:
-            # Reuse group if seed re-run mid-year; otherwise create
+        groups = {}
+        for group_name, seqs in group_defs:
             group = None
             for g in db.session.scalars(
                 db.select(Group).filter_by(academic_year=year)
@@ -370,7 +376,6 @@ def initialize():
                     )
                 ).first()
                 if not already:
-                    # Drop other year-group memberships for this student first
                     other = db.session.scalars(
                         db.select(StudentGroup)
                         .join(Group, Group.id == StudentGroup.groupID)
@@ -390,11 +395,149 @@ def initialize():
             if has_lots:
                 if group.status != "approved":
                     approve_group(group.id)
-                continue
-            ok, err = assign_exclusive_lots(group.id, count=2)
-            if not ok:
-                approve_group(group.id)
-                print(f"warn: could not auto-assign lots for {group_name} {year}: {err}")
+            else:
+                ok, err = assign_exclusive_lots(group.id, count=2)
+                if not ok:
+                    approve_group(group.id)
+                    print(f"warn: could not auto-assign lots for {group_name} {year}: {err}")
+            groups[group_name] = group
+        return groups
+
+    def _lot_type_key(lot):
+        for key, lab in types.items():
+            if lot.labTypeId == lab.id or lot.labType == lab.name:
+                return key
+        return "gis"
+
+    def _group_lot_ids(group):
+        return db.session.scalars(
+            db.select(LotGroup.lotID)
+            .filter_by(groupID=group.id)
+            .order_by(LotGroup.lotID)
+        ).all()
+
+    def _seed_2025_rfps_and_bids(groups):
+        """
+        2025 demo market: RFPs on Alpha/Beta/Gamma/Delta lots, competing bids
+        (one per vendor per lot), and evaluations with a selected winner per lot.
+        """
+        alpha = groups["AlphaLab"]
+        beta = groups["BetaLab"]
+        gamma = groups["GammaLab"]
+        delta = groups["DeltaLab"]
+
+        def lots_of(g):
+            ids = _group_lot_ids(g)
+            if len(ids) < 2:
+                raise RuntimeError(f"{g.groupName} needs 2 lots for 2025 RFP seed")
+            return ids[0], ids[1]
+
+        a0, a1 = lots_of(alpha)
+        b0, b1 = lots_of(beta)
+        g0, g1 = lots_of(gamma)
+        d0, d1 = lots_of(delta)
+
+        lot_map = {lid: get_lot(lid) for lid in (a0, a1, b0, b1, g0, g1, d0, d1)}
+
+        # Published RFPs (clients)
+        for owner, lot_id in (
+            (alpha, a0), (alpha, a1),
+            (beta, b0), (beta, b1),
+            (gamma, g0),
+            (delta, d0),
+        ):
+            lot = lot_map[lot_id]
+            create_rfp(
+                owner.id, lot_id, status="submitted",
+                **TYPE_SPECS[_lot_type_key(lot)],
+            )
+        # One draft RFP left on Gamma's second lot
+        create_rfp(
+            gamma.id, g1, status="draft",
+            **TYPE_SPECS[_lot_type_key(lot_map[g1])],
+        )
+
+        cover = (
+            "<p>We are pleased to submit this proposal for your consideration. "
+            "Our team can deliver to the published specification on schedule "
+            "with installation and 12-month support included.</p>"
+        )
+
+        def bid(lot_id, vendor, client, price, slug):
+            lot = lot_map[lot_id]
+            return create_bid(
+                lot_id,
+                vendor.id,
+                client.id,
+                generate_sample_pdf(vendor.groupName.split(" ", 1)[-1], lot.labType, price),
+                f"{slug}.pdf",
+                float(price),
+                message=cover,
+            )
+
+        # Competing bids on Alpha RFPs
+        bid_a0_b = bid(a0, beta, alpha, 98000, "2025_beta_on_alpha_1")
+        bid_a0_g = bid(a0, gamma, alpha, 101500, "2025_gamma_on_alpha_1")
+        bid_a0_d = bid(a0, delta, alpha, 96500, "2025_delta_on_alpha_1")
+        bid_a1_b = bid(a1, beta, alpha, 72000, "2025_beta_on_alpha_2")
+        bid_a1_g = bid(a1, gamma, alpha, 74500, "2025_gamma_on_alpha_2")
+
+        # Competing bids on Beta RFPs
+        bid_b0_a = bid(b0, alpha, beta, 88000, "2025_alpha_on_beta_1")
+        bid_b0_g = bid(b0, gamma, beta, 91000, "2025_gamma_on_beta_1")
+        bid_b0_d = bid(b0, delta, beta, 89500, "2025_delta_on_beta_1")
+        bid_b1_a = bid(b1, alpha, beta, 155000, "2025_alpha_on_beta_2")
+        bid_b1_d = bid(b1, delta, beta, 149000, "2025_delta_on_beta_2")
+
+        # Bids on Gamma / Delta RFPs
+        bid_g0_a = bid(g0, alpha, gamma, 112000, "2025_alpha_on_gamma_1")
+        bid_g0_b = bid(g0, beta, gamma, 108500, "2025_beta_on_gamma_1")
+        bid_d0_a = bid(d0, alpha, delta, 64000, "2025_alpha_on_delta_1")
+        bid_d0_b = bid(d0, beta, delta, 67500, "2025_beta_on_delta_1")
+        bid_d0_g = bid(d0, gamma, delta, 65800, "2025_gamma_on_delta_1")
+
+        full_specs = "deviceType,cpu,ram,resolution,os,drive,gpu,features"
+        mid_specs = "deviceType,cpu,ram,resolution,os,drive,gpu"
+        lean_specs = "deviceType,cpu,ram,os,drive"
+
+        def evaluate(client, vendor, bid_obj, lot_id, scores, specs_selected):
+            sm, pr, pf, bu = scores
+            ev = create_evaluation(
+                client.id, vendor.id, bid_obj.id, lot_id, sm, pr, pf, bu
+            )
+            edit_evaluation(ev.id, sm, pr, pf, bu, specsSelected=specs_selected)
+            return ev
+
+        # Alpha evaluates all bids on both lots
+        ea0_b = evaluate(alpha, beta, bid_a0_b, a0, (4, 3, 4, 3), mid_specs)
+        ea0_g = evaluate(alpha, gamma, bid_a0_g, a0, (5, 4, 4, 4), full_specs)
+        ea0_d = evaluate(alpha, delta, bid_a0_d, a0, (3, 3, 3, 2), lean_specs)
+        select_evaluation(ea0_g.id)
+
+        ea1_b = evaluate(alpha, beta, bid_a1_b, a1, (4, 4, 3, 4), mid_specs)
+        ea1_g = evaluate(alpha, gamma, bid_a1_g, a1, (3, 3, 4, 3), mid_specs)
+        select_evaluation(ea1_b.id)
+
+        # Beta evaluates all bids on both lots
+        eb0_a = evaluate(beta, alpha, bid_b0_a, b0, (4, 4, 5, 4), full_specs)
+        eb0_g = evaluate(beta, gamma, bid_b0_g, b0, (3, 4, 3, 3), mid_specs)
+        eb0_d = evaluate(beta, delta, bid_b0_d, b0, (4, 3, 4, 4), mid_specs)
+        select_evaluation(eb0_a.id)
+
+        eb1_a = evaluate(beta, alpha, bid_b1_a, b1, (5, 4, 4, 3), full_specs)
+        eb1_d = evaluate(beta, delta, bid_b1_d, b1, (4, 5, 4, 5), full_specs)
+        select_evaluation(eb1_d.id)
+
+        # Gamma evaluates bids on g0 (draft lot g1 has no bids)
+        eg0_a = evaluate(gamma, alpha, bid_g0_a, g0, (4, 4, 3, 3), mid_specs)
+        eg0_b = evaluate(gamma, beta, bid_g0_b, g0, (5, 4, 5, 4), full_specs)
+        select_evaluation(eg0_b.id)
+
+        # Delta evaluates all three bids on d0
+        ed0_a = evaluate(delta, alpha, bid_d0_a, d0, (3, 4, 3, 4), lean_specs)
+        ed0_b = evaluate(delta, beta, bid_d0_b, d0, (4, 3, 4, 3), mid_specs)
+        ed0_g = evaluate(delta, gamma, bid_d0_g, d0, (5, 5, 4, 4), full_specs)
+        select_evaluation(ed0_g.id)
 
     _seed_students(archive_year)
     for open_year in SEED_OPEN_YEARS:
@@ -522,7 +665,13 @@ def initialize():
     select_evaluation(eval4.id)
     select_evaluation(eval6.id)
 
-    # ─── Open years: same lots + 2 test groups (6 students), no RFPs / bids ────
+    # ─── Open years: lots + test groups; 2025 also gets RFPs / bids / evals ────
     for open_year in SEED_OPEN_YEARS:
         _seed_lots(types, open_year)
-        _seed_test_groups(open_year)
+        if open_year == 2025:
+            groups_2025 = _seed_test_groups(
+                open_year, TEST_GROUP_DEFS + SEED_2025_EXTRA_GROUPS
+            )
+            _seed_2025_rfps_and_bids(groups_2025)
+        else:
+            _seed_test_groups(open_year)

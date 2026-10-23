@@ -60,7 +60,7 @@ These passwords are for local/lab demos. Do not reuse in production.
 
 Examples: `20260001` / `aidenpass` (AlphaLab), `20250004` / `danielpass` (BetaLab).
 
-Student accounts are year-specific. Seed: **2024** full archive (10 groups + RFPs/bids); **2025/2026** same lots + students, plus **2 approved test groups** of 3 (`AlphaLab`, `BetaLab`) with exclusive lots. Platform current year is set in **Settings** (default 2026); the admin sidebar year dropdown only previews records.
+Student accounts are year-specific. Seed: **2024** full archive (10 groups + RFPs/bids); **2025** lots + 4 groups (`AlphaLab`–`DeltaLab`) with submitted RFPs, competing bids, and evaluations (winner selected per scored lot); **2026** lots + `AlphaLab`/`BetaLab` only. Platform current year is set in **Settings** (default 2026); the admin sidebar year dropdown only previews records.
 
 ## Admin: group size & CSV import
 
