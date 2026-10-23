@@ -305,29 +305,94 @@ def initialize():
         ("Darren Mitchell", 31, "darrenpass", "darren"),
     ]
 
-    def _seed_students(year):
-        for name, seq, password, email_local in student_roster:
+    def _seed_students(year, roster=None):
+        roster = roster if roster is not None else student_roster
+        for name, seq, password, email_local in roster:
             create_student(
                 name,
                 f"{year}{seq:04d}",
                 password,
                 email=f"{email_local}{year}@lab.local",
                 academic_year=year,
+                account_claimed=True,
             )
 
     def _seed_test_groups(year):
-        """Two approved groups of three (students 0001–0006) for lab demos."""
+        """
+        Ensure the six demo students exist, then two approved groups of three.
+        Students are created here (not only earlier) so open years never end up
+        with empty AlphaLab/BetaLab shells.
+        """
+        test_roster = [row for row in student_roster if row[1] in (1, 2, 3, 4, 5, 6)]
+        for name, seq, password, email_local in test_roster:
+            username = f"{year}{seq:04d}"
+            existing = db.session.scalars(
+                db.select(Student).filter_by(username=username)
+            ).first()
+            if existing:
+                if existing.academic_year != year:
+                    existing.academic_year = year
+                existing.account_claimed = True
+                continue
+            create_student(
+                name,
+                username,
+                password,
+                email=f"{email_local}{year}@lab.local",
+                academic_year=year,
+                account_claimed=True,
+            )
+
         for group_name, seqs in TEST_GROUP_DEFS:
-            group = create_group(group_name, academic_year=year)
+            # Reuse group if seed re-run mid-year; otherwise create
+            group = None
+            for g in db.session.scalars(
+                db.select(Group).filter_by(academic_year=year)
+            ).all():
+                if group_name in (g.groupName or ""):
+                    group = g
+                    break
+            if not group:
+                group = create_group(group_name, academic_year=year)
+
             for seq in seqs:
                 username = f"{year}{seq:04d}"
                 student = db.session.scalars(
                     db.select(Student).where(Student.username == username)
                 ).first()
-                add_studentGroup(student.id, group.id)
+                if not student:
+                    raise RuntimeError(
+                        f"Seed student {username} missing for {year} before grouping"
+                    )
+                already = db.session.scalars(
+                    db.select(StudentGroup).filter_by(
+                        studentID=student.id, groupID=group.id
+                    )
+                ).first()
+                if not already:
+                    # Drop other year-group memberships for this student first
+                    other = db.session.scalars(
+                        db.select(StudentGroup)
+                        .join(Group, Group.id == StudentGroup.groupID)
+                        .filter(
+                            StudentGroup.studentID == student.id,
+                            Group.academic_year == year,
+                            Group.id != group.id,
+                        )
+                    ).all()
+                    for m in other:
+                        db.session.delete(m)
+                    add_studentGroup(student.id, group.id)
+
+            has_lots = db.session.scalars(
+                db.select(LotGroup).filter_by(groupID=group.id)
+            ).first()
+            if has_lots:
+                if group.status != "approved":
+                    approve_group(group.id)
+                continue
             ok, err = assign_exclusive_lots(group.id, count=2)
             if not ok:
-                # Still leave group approved so demos can proceed without lots
                 approve_group(group.id)
                 print(f"warn: could not auto-assign lots for {group_name} {year}: {err}")
 
