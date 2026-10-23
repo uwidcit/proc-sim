@@ -48,13 +48,19 @@ Set `SECRET_KEY` in the environment for any non-local deploy.
 
 These passwords are for local/lab demos. Do not reuse in production.
 
-| Role | Username | Password |
-|------|----------|----------|
-| Admin | bob | bobpass |
-| Student 2024 (NexoraTech) | 20240001 | aidenpass |
-| Student 2026 (unassigned) | 20260001 | aidenpass |
+| Role | Username | Password | Group |
+|------|----------|----------|-------|
+| Admin | admin | plattech2026 | — |
+| Student (every year) | `{year}0001` | aidenpass | AlphaLab / NexoraTech (2024) |
+| Student | `{year}0002` | kareempass | same |
+| Student | `{year}0003` | joshuapass | same |
+| Student | `{year}0004` | danielpass | BetaLab / QuantumSoft (2024) |
+| Student | `{year}0005` | samanthapass | same |
+| Student | `{year}0006` | aaliyahpass | same |
 
-Student accounts are year-specific. Group creation only lists students for the current year. Seed: 2024 full archive; 2025/2026 same lots + year-scoped students (no groups/RFPs/bids). Admin sets the current year in the sidebar or Settings (default 2026); it applies to all students.
+Examples: `20260001` / `aidenpass` (AlphaLab), `20250004` / `danielpass` (BetaLab).
+
+Student accounts are year-specific. Seed: **2024** full archive (10 groups + RFPs/bids); **2025/2026** same lots + students, plus **2 approved test groups** of 3 (`AlphaLab`, `BetaLab`) with exclusive lots. Platform current year is set in **Settings** (default 2026); the admin sidebar year dropdown only previews records.
 
 ## Admin: group size & CSV import
 

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, jsonify, redirect, request, url_fo
 from flask_jwt_extended import jwt_required, current_user
 from functools import wraps
 
-from App.controllers.academic_year import set_current_year, is_valid_year
+from App.controllers.academic_year import set_admin_view_year, is_valid_year
 
 index_views = Blueprint('index_views', __name__, template_folder='../templates')
 
@@ -26,15 +26,16 @@ def index_page():
 @index_views.route('/set-academic-year', methods=['POST'])
 @admin_required
 def set_academic_year():
+    """Admin preview only — does not change the platform current year in Settings."""
     year = request.form.get('year')
     if not is_valid_year(year):
         flash('Invalid academic year', 'failed')
     else:
-        set_year = set_current_year(year)
+        set_year = set_admin_view_year(year)
         if set_year:
-            flash(f'Current academic year set to {set_year} for all students', 'success')
+            flash(f'Viewing {set_year} records', 'success')
         else:
-            flash('Could not update academic year', 'failed')
+            flash('Could not update view year', 'failed')
     next_url = request.form.get('next') or request.referrer or url_for('index_views.index_page')
     return redirect(next_url)
 

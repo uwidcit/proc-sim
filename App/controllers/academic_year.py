@@ -20,7 +20,7 @@ def is_valid_year(year):
 
 
 def get_active_year():
-    """Platform current year (persisted; used by students and admin)."""
+    """Platform current year (persisted in Settings; used by students)."""
     try:
         from App.controllers.settings import get_active_academic_year
 
@@ -29,13 +29,45 @@ def get_active_year():
         return DEFAULT_ACADEMIC_YEAR
 
 
+def _admin_preview_year():
+    """Session-only year for admin record browsing, if an admin is logged in."""
+    try:
+        from flask_jwt_extended import verify_jwt_in_request, current_user
+
+        verify_jwt_in_request(optional=True)
+        user = current_user
+        if not user or not user.is_admin():
+            return None
+        preview = session.get(SESSION_KEY)
+        if is_valid_year(preview):
+            return int(preview)
+    except Exception:
+        return None
+    return None
+
+
 def get_current_year():
-    """Data scope year — always the admin-configured current year."""
+    """
+    Data-scope year for admin screens: sidebar preview if set, else platform year.
+    Students always resolve to the platform active year (no preview session).
+    """
+    preview = _admin_preview_year()
+    if preview is not None:
+        return preview
     return get_active_year()
 
 
+def set_admin_view_year(year):
+    """Admin sidebar: preview another year's records (session only)."""
+    year = int(year)
+    if year not in ACADEMIC_YEARS:
+        return None
+    session[SESSION_KEY] = year
+    return year
+
+
 def set_current_year(year):
-    """Set the current academic year for everyone (persisted + session)."""
+    """Settings: set the platform current year for all students (persisted)."""
     year = int(year)
     if year not in ACADEMIC_YEARS:
         return None
@@ -44,8 +76,4 @@ def set_current_year(year):
     settings, err = set_active_academic_year(year)
     if err or not settings:
         return None
-    try:
-        session[SESSION_KEY] = year
-    except RuntimeError:
-        pass
     return year

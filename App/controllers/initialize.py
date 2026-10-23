@@ -5,7 +5,7 @@ from .labType import create_lab_type
 from .student import create_student
 from .admin import create_admin
 from .group import create_group, approve_group
-from .lotGroup import add_lotGroup
+from .lotGroup import add_lotGroup, assign_exclusive_lots
 from .rfp import create_rfp, submit_rfp
 from .bid import create_bid
 from .evaluation import create_evaluation, edit_evaluation, select_evaluation
@@ -13,6 +13,12 @@ from .settings import get_or_create_settings
 from App.academic_years import SEED_ARCHIVE_YEAR, SEED_OPEN_YEARS, SEED_CURRENT_YEAR
 from .settings import set_active_academic_year
 from App.models import *
+
+# Six demo students → two groups of three (same people every year; IDs prefixed by year)
+TEST_GROUP_DEFS = (
+    ("AlphaLab", (1, 2, 3)),
+    ("BetaLab", (4, 5, 6)),
+)
 
 
 def generate_sample_pdf(vendor_name, lot_name, price, currency="TTD"):
@@ -239,7 +245,7 @@ def initialize():
     get_or_create_settings()
     set_active_academic_year(SEED_CURRENT_YEAR)
     archive_year = SEED_ARCHIVE_YEAR
-    create_admin("bob", "bobpass")
+    create_admin("admin", "plattech2026")
 
     types = {
         "gis": create_lab_type(
@@ -308,6 +314,22 @@ def initialize():
                 email=f"{email_local}{year}@lab.local",
                 academic_year=year,
             )
+
+    def _seed_test_groups(year):
+        """Two approved groups of three (students 0001–0006) for lab demos."""
+        for group_name, seqs in TEST_GROUP_DEFS:
+            group = create_group(group_name, academic_year=year)
+            for seq in seqs:
+                username = f"{year}{seq:04d}"
+                student = db.session.scalars(
+                    db.select(Student).where(Student.username == username)
+                ).first()
+                add_studentGroup(student.id, group.id)
+            ok, err = assign_exclusive_lots(group.id, count=2)
+            if not ok:
+                # Still leave group approved so demos can proceed without lots
+                approve_group(group.id)
+                print(f"warn: could not auto-assign lots for {group_name} {year}: {err}")
 
     _seed_students(archive_year)
     for open_year in SEED_OPEN_YEARS:
@@ -435,6 +457,7 @@ def initialize():
     select_evaluation(eval4.id)
     select_evaluation(eval6.id)
 
-    # ─── Open years: same lots, students only (no groups / RFPs / bids) ────────
+    # ─── Open years: same lots + 2 test groups (6 students), no RFPs / bids ────
     for open_year in SEED_OPEN_YEARS:
         _seed_lots(types, open_year)
+        _seed_test_groups(open_year)

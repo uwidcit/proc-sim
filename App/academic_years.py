@@ -3,7 +3,8 @@
 DEFAULT_ACADEMIC_YEAR = 2026
 # Prior closed year (2024) plus open years through the next five after default
 ACADEMIC_YEARS = tuple(range(2024, DEFAULT_ACADEMIC_YEAR + 6))
-SESSION_KEY = "academic_year"
+# Admin sidebar preview year (session only; not the platform current year)
+SESSION_KEY = "admin_view_year"
 
 # Seed: full procurement archive vs empty open years (lots + shared students only)
 SEED_ARCHIVE_YEAR = 2024
