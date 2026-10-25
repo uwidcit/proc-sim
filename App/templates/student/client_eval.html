@@ -9,7 +9,7 @@
     class="tab {% if request.args.get('selected_lot', lots[0].id|string if lots else '1') == lot.id|string %}is-active{% endif %}"
     onclick="window.location.href='?selected_lot={{ lot.id }}'"
   >
-    Lot {{ lot.id }}
+    {{ lot.name or ('Lot ' ~ lot.id) }}
   </button>
   {% endfor %}
 </div>

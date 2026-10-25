@@ -147,7 +147,7 @@
             data-group-id="{{ request.id }}"
             data-display-name="{{ request.display_name|e }}"
             data-member-ids="{{ request.member_ids|join(',') }}"
-            data-lot-ids="{{ request.lots|join(',') }}"
+            data-lot-ids="{{ request.lot_ids|join(',') }}"
           >Edit</button>
           <button type="button" class="btn btn-primary approve-btn" data-group-id="{{ request.id }}">Approve (auto-assign)</button>
           <button type="button" class="btn btn-danger decline-btn" data-group-id="{{ request.id }}">Reject</button>
@@ -180,7 +180,7 @@
         </ul>
         <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
           {% for lot in group.lots %}
-          <span class="badge badge-accent">Lot {{ lot }}</span>
+          <span class="badge badge-accent">{{ lot.label }}</span>
           {% else %}
           <span style="font-size:0.75rem; color:var(--ink-muted);">No lots</span>
           {% endfor %}
@@ -193,7 +193,7 @@
               data-group-id="{{ group.id }}"
               data-display-name="{{ group.display_name|e }}"
               data-member-ids="{{ group.member_ids|join(',') }}"
-              data-lot-ids="{{ group.lots|join(',') }}"
+              data-lot-ids="{{ group.lot_ids|join(',') }}"
             >Edit</button>
             <button type="button" class="btn btn-danger remove-btn" data-group-id="{{ group.id }}">Remove</button>
           </div>

@@ -9,7 +9,7 @@
     class="tab {% if request.args.get('selected_lot', lots[0].id|string if lots else '1') == lot.id|string %}is-active{% endif %}"
     onclick="window.location.href='?selected_lot={{ lot.id }}'"
   >
-    Lot {{ lot.id }}
+    {{ lot.name or ('Lot ' ~ lot.id) }}
   </button>
   {% endfor %}
 </div>
@@ -18,7 +18,7 @@
   <div style="min-width:0;">
     <div class="font-heading" style="font-weight:700;">{{ current_lot.lab_type }}</div>
     <div style="font-size:0.8rem; color:var(--ink-muted);">
-      Bids received for Lot {{ current_lot.id }}
+      Bids received for {{ current_lot.name or ('Lot ' ~ current_lot.id) }}
       · {{ current_lot.description }}
     </div>
   </div>

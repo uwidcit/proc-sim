@@ -52,6 +52,7 @@
         data-client-name="{{ evaluation.name|e }}"
         data-vendor-name="{{ evaluation.to_group_name|e }}"
         data-lot-id="{{ evaluation.lotID }}"
+        data-lot-label="{{ evaluation.lot_label or ('Lot ' ~ evaluation.lotID) }}"
         data-lab-type="{{ evaluation.labType|e }}"
         data-timestamp="{{ evaluation.timestamp|e }}"
         data-specs="{{ evaluation.specsMet }}"
@@ -65,7 +66,7 @@
           <span class="badge badge-ok">{{ evaluation.overall }}/10</span>
         </span>
         <span class="panel-card-meta">Vendor {{ evaluation.to_group_name }}</span>
-        <span class="panel-card-meta" style="flex:0;">Lot {{ evaluation.lotID }} · {{ evaluation.labType }}</span>
+        <span class="panel-card-meta" style="flex:0;">{{ evaluation.lot_label or ('Lot ' ~ evaluation.lotID) }} · {{ evaluation.labType }}</span>
         <span class="panel-card-meta" style="flex:0;">{{ evaluation.timestamp }}</span>
       </button>
       {% endfor %}
@@ -431,7 +432,7 @@
 
     document.getElementById('previewTitle').textContent = card.dataset.clientName || 'Evaluation preview';
     document.getElementById('previewOverallBadge').textContent = overall + '/10';
-    document.getElementById('previewLotBadge').textContent = 'Lot ' + (card.dataset.lotId || '');
+    document.getElementById('previewLotBadge').textContent = card.dataset.lotLabel || ('Lot ' + (card.dataset.lotId || ''));
     document.getElementById('previewTimestamp').textContent = card.dataset.timestamp || '';
     setText('preview-client', card.dataset.clientName);
     setText('preview-vendor', card.dataset.vendorName);
@@ -470,8 +471,8 @@
     document.getElementById('compareTitle').textContent = 'Compare bid & RFP';
     document.getElementById('compareSubtitle').textContent =
       (data.name || 'Client') + ' · ' + (data.to_group_name || 'Vendor') +
-      ' · Lot ' + (data.lotID || '') + selectedMark;
-    document.getElementById('compareRfpLot').textContent = data.labType || ('Lot ' + data.lotID);
+      ' · ' + (data.lot_label || ('Lot ' + (data.lotID || ''))) + selectedMark;
+    document.getElementById('compareRfpLot').textContent = data.labType || data.lot_label || ('Lot ' + data.lotID);
     document.getElementById('compareBidFile').textContent = data.bid_filename || 'Bid PDF';
 
     const list = document.getElementById('compareRfpList');
@@ -497,7 +498,7 @@
       overall != null ? overall + '/10' : 'No eval';
     document.getElementById('compareOverallBadge').className =
       'badge ' + (data.status === 'selected' ? 'badge-ok' : 'badge-pending');
-    document.getElementById('compareLotBadge').textContent = 'Lot ' + (data.lotID || '');
+    document.getElementById('compareLotBadge').textContent = data.lot_label || ('Lot ' + (data.lotID || ''));
     document.getElementById('compareEvalMeta').textContent =
       (data.to_group_name || 'Vendor') +
       (data.timestamp ? ' · ' + data.timestamp : '') +

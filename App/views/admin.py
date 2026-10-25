@@ -45,7 +45,7 @@ def admin_required(f):
 def admin_manage_lots():
     year = get_current_year()
     lots = db.session.scalars(
-        db.select(Lot).filter_by(academic_year=year)
+        db.select(Lot).filter_by(academic_year=year).order_by(Lot.id)
     ).all()
 
     lab_types = get_all_lab_types()
@@ -181,6 +181,7 @@ def admin_manage_bids():
                 "source_group_name": group.groupName,
                 "to_group_name": to_group.groupName if to_group else "—",
                 "to_lot_id": to_lot.id if to_lot else None,
+                "to_lot_label": display_lot_label(to_lot) if to_lot else "—",
                 "to_lot_name": to_lot.labType if to_lot else "—",
                 "timestamp": format_timestamp(bid_obj.timestamp),
                 "filename": bid_obj.bidDocumentName,
@@ -271,13 +272,22 @@ def admin_manage_groups():
 
         if group.status == "requested":
             dic["lots"] = []
+            dic["lot_ids"] = []
             GROUP_REQUESTS.append(dic)
         else:
             entries = db.session.scalars(
                 db.select(LotGroup)
                 .filter_by(groupID=group.id)
             ).all()
-            dic["lots"] = [entry.lotID for entry in entries]
+            lot_rows = []
+            for entry in entries:
+                lot = get_lot(entry.lotID)
+                lot_rows.append({
+                    "id": entry.lotID,
+                    "label": display_lot_label(lot) if lot else f"Lot {entry.lotID}",
+                })
+            dic["lots"] = lot_rows
+            dic["lot_ids"] = [row["id"] for row in lot_rows]
             GROUPS.append(dic)
 
     LOTS = db.session.scalars(
@@ -338,7 +348,7 @@ def admin_manage_groups():
         owner_id = lot_owner.get(lot.id)
         year_lots.append({
             "id": lot.id,
-            "name": lot.name or f"Lot {lot.id}",
+            "name": display_lot_label(lot),
             "group_id": owner_id,
             "group_name": group_name_by_id.get(owner_id) if owner_id else None,
         })
@@ -585,8 +595,9 @@ def admin_manage_rfps():
         return {
             "groupID": entry.groupID,
             "lotID": entry.lotID,
+            "lot_label": display_lot_label(lot) if lot else f"Lot {entry.lotID}",
             "name": group.groupName,
-            "Lot": lot.labType,
+            "Lot": lot.labType if lot else "—",
             "timestamp": format_timestamp(entry.timestamp),
             "status": entry.status,
             "deviceType": entry.deviceType,
@@ -650,6 +661,7 @@ def _evaluation_compare_payload(evaluation, bid=None, lot=None, rfp=None, client
         "name": client.groupName if client else "—",
         "to_group_name": vendor.groupName if vendor else "—",
         "lotID": lot_id,
+        "lot_label": display_lot_label(lot) if lot else f"Lot {lot_id}",
         "labType": lot.labType if lot else "—",
         "lot_budget": lot.budget if lot else None,
         "timestamp": format_timestamp(evaluation.timestamp) if evaluation else "",

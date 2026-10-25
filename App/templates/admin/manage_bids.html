@@ -48,7 +48,7 @@
       >
         <span style="display:flex; align-items:start; justify-content:space-between; gap:0.5rem;">
           <span class="panel-card-title">{{ bid.source_group_name }}</span>
-          <span class="badge badge-accent">Lot {{ bid.to_lot_id }}</span>
+          <span class="badge badge-accent">{{ bid.to_lot_label or ('Lot ' ~ bid.to_lot_id) }}</span>
         </span>
         <span class="panel-card-meta">To {{ bid.to_group_name }} · {{ bid.to_lot_name }}</span>
         <span class="panel-card-meta" style="flex:0;">{{ bid.timestamp }}</span>

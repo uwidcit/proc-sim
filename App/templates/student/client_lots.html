@@ -13,7 +13,7 @@
         class="tab {% if request.args.get('selected_lot', lots[0].id|string) == lot.id|string %}is-active{% endif %}"
         onclick="window.location.href='?selected_lot={{ lot.id }}'"
       >
-        Lot {{ lot.id }}
+        {{ lot.name or ('Lot ' ~ lot.id) }}
       </button>
       {% endfor %}
     </div>
@@ -21,7 +21,7 @@
     <div class="toolbar lot-toolbar">
       <div style="min-width:0; flex:1 1 12rem;">
         <h2 class="font-heading" style="margin:0; font-size:1.15rem; font-weight:700;">
-          {% if is_locked %}RFP for Lot {{ current_lot.id }}{% else %}Create RFP for Lot {{ current_lot.id }}{% endif %}
+          {% if is_locked %}RFP for {{ current_lot.name or ('Lot ' ~ current_lot.id) }}{% else %}Create RFP for {{ current_lot.name or ('Lot ' ~ current_lot.id) }}{% endif %}
         </h2>
         <div style="font-size:0.8rem; color:var(--ink-muted); margin-top:0.25rem;">
           {{ current_lot.labType }} · {{ current_lot.labSize }} · {{ current_lot.numMachines }} machines

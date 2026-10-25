@@ -58,13 +58,14 @@
     type="button"
     class="panel-card lot-card"
     data-lot-id="{{ lot.id }}"
+    data-lot-label="{{ lot.name or ('Lot ' ~ lot.id) }}"
     data-lab-type-id="{{ lot.labTypeId if lot.labTypeId is not none else '' }}"
     data-lab-type-name="{{ lot.labType }}"
     data-lab-size="{{ lot.labSize }}"
     data-num-machines="{{ lot.numMachines }}"
     data-budget="{{ lot.budget }}"
   >
-    <span class="panel-card-title">Lot {{ lot.id }}</span>
+    <span class="panel-card-title">{{ lot.name or ('Lot ' ~ lot.id) }}</span>
     <span class="lot-card-row">
       <span class="lot-card-label">Type</span>
       <span class="lot-card-value">{{ lot.labType }}</span>
@@ -186,6 +187,7 @@
       machinesInput.value = card.dataset.numMachines || '';
       budgetInput.value = card.dataset.budget || '';
       document.getElementById('removeLotForm').action = `/admin/lots/${activeId}/remove`;
+      document.getElementById('lotModalTitle').textContent = 'Edit ' + (card.dataset.lotLabel || ('Lot ' + activeId));
       showModal('lotModal');
     });
   });

@@ -1,6 +1,52 @@
+import re
+
 from App.models import Lot, LotGroup
 from App.database import db
 from .academic_year import get_current_year
+
+_LOT_NAME_RE = re.compile(r"^Lot\s+(\d+)$", re.IGNORECASE)
+
+
+def display_lot_label(lot):
+    """User-facing lot label (year-scoped name), falling back to Lot {id}."""
+    if not lot:
+        return ""
+    name = (lot.name or "").strip()
+    if name and not name.startswith("__tmp_"):
+        return name
+    return f"Lot {lot.id}"
+
+
+def next_lot_number(academic_year=None):
+    """Next incremental Lot N label for the academic year (starts at 1)."""
+    if academic_year is None:
+        academic_year = get_current_year()
+    max_n = 0
+    for lot in get_all_lots(academic_year=academic_year):
+        match = _LOT_NAME_RE.match((lot.name or "").strip())
+        if match:
+            max_n = max(max_n, int(match.group(1)))
+    return max_n + 1
+
+
+def renumber_lots_for_year(academic_year=None):
+    """Reset lot labels for a year to Lot 1..N (creation order by id)."""
+    if academic_year is None:
+        academic_year = get_current_year()
+    lots = db.session.scalars(
+        db.select(Lot)
+        .filter_by(academic_year=academic_year)
+        .order_by(Lot.id)
+    ).all()
+    if not lots:
+        return []
+    for lot in lots:
+        lot.name = f"__tmp_{lot.id}__"
+    db.session.flush()
+    for index, lot in enumerate(lots, start=1):
+        lot.name = f"Lot {index}"
+    db.session.commit()
+    return lots
 
 
 def create_lot(labType, labSize, budget, labTypeId=None, academic_year=None, numMachines=0):
@@ -17,7 +63,7 @@ def create_lot(labType, labSize, budget, labTypeId=None, academic_year=None, num
         newlot.labTypeId = labTypeId
     db.session.add(newlot)
     db.session.flush()
-    newlot.set_generated_name()
+    newlot.name = f"Lot {next_lot_number(academic_year)}"
     db.session.commit()
     return newlot
 

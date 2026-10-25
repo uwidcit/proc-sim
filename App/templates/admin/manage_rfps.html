@@ -55,7 +55,7 @@
           <span class="badge badge-ok">Published</span>
           {% endif %}
         </span>
-        <span class="panel-card-meta">Lot {{ rfp.lotID }} · {{ rfp.Lot }}</span>
+        <span class="panel-card-meta">{{ rfp.lot_label or ('Lot ' ~ rfp.lotID) }} · {{ rfp.Lot }}</span>
         <span class="panel-card-meta" style="flex:0;">{{ rfp.timestamp }}</span>
       </button>
       {% endfor %}

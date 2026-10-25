@@ -477,6 +477,7 @@ def student_view_bids_page():
     for lot in yourLots:
         data = {
             "id": lot.id,
+            "name": display_lot_label(lot),
             "lab_type": lot.labType,
             "budget": lot.budget,
             "lab_size": lot.labSize,
@@ -490,6 +491,7 @@ def student_view_bids_page():
 
     current_lot = {
         "id": current_lot_obj.id,
+        "name": display_lot_label(current_lot_obj),
         "lab_type": current_lot_obj.labType,
         "budget": current_lot_obj.budget,
         "lab_size": current_lot_obj.labSize,
@@ -713,7 +715,10 @@ def student_client_evaluation_page():
             "is_selected": evaluation.status != "draft",
         })
 
-    lots_list = [{"id": lot.id, "lab_type": lot.labType} for lot in yourLots]
+    lots_list = [
+        {"id": lot.id, "name": display_lot_label(lot), "lab_type": lot.labType}
+        for lot in yourLots
+    ]
 
     return render_template(
         'student/client_eval.html',
