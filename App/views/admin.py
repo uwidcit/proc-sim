@@ -252,32 +252,32 @@ def admin_manage_groups():
             db.select(Student)
             .join(StudentGroup, Student.id == StudentGroup.studentID)
             .filter(StudentGroup.groupID == group.id)
+            .order_by(Student.name)
         ).all()
 
         members = []
         for student in students:
-            member = {}
-            member["name"] = student.name
-            member["id"] = student.username
-            members.append(member)
+            members.append({
+                "db_id": student.id,
+                "name": student.name,
+                "id": student.username,
+            })
             group_name_by_student[student.id] = group.groupName
 
         dic["members"] = members
+        dic["member_ids"] = [m["db_id"] for m in members]
+        dic["display_name"] = display_group_name(group)
+        dic["status"] = group.status
 
         if group.status == "requested":
+            dic["lots"] = []
             GROUP_REQUESTS.append(dic)
         else:
             entries = db.session.scalars(
                 db.select(LotGroup)
                 .filter_by(groupID=group.id)
             ).all()
-
-            lots = []
-            for entry in entries:
-                lots.append(entry.lotID)
-
-            dic["lots"] = lots
-
+            dic["lots"] = [entry.lotID for entry in entries]
             GROUPS.append(dic)
 
     LOTS = db.session.scalars(
@@ -301,6 +301,7 @@ def admin_manage_groups():
             ungrouped_count += 1
         if not student.account_claimed:
             unclaimed_count += 1
+        membership = check_studentGroup(student.id, academic_year=year)
         student_rows.append({
             "id": student.id,
             "name": student.name,
@@ -308,6 +309,38 @@ def admin_manage_groups():
             "email": student.email or "",
             "claimed": bool(student.account_claimed),
             "group": group_name,
+            "group_id": membership.groupID if membership else None,
+        })
+
+    all_groups_options = [
+        {
+            "id": g.id,
+            "name": g.groupName,
+            "display_name": display_group_name(g),
+            "status": g.status,
+        }
+        for g in groups
+    ]
+
+    group_name_by_id = {g.id: g.groupName for g in groups}
+    lot_owner = {
+        e.lotID: e.groupID
+        for e in db.session.scalars(
+            db.select(LotGroup)
+            .join(Lot, Lot.id == LotGroup.lotID)
+            .filter(Lot.academic_year == year)
+        ).all()
+    }
+    year_lots = []
+    for lot in db.session.scalars(
+        db.select(Lot).filter_by(academic_year=year).order_by(Lot.id)
+    ).all():
+        owner_id = lot_owner.get(lot.id)
+        year_lots.append({
+            "id": lot.id,
+            "name": lot.name or f"Lot {lot.id}",
+            "group_id": owner_id,
+            "group_name": group_name_by_id.get(owner_id) if owner_id else None,
         })
 
     return render_template('admin/manage_groups.html',
@@ -315,7 +348,9 @@ def admin_manage_groups():
                          title='Manage Groups',
                          group_requests=GROUP_REQUESTS,
                          groups=GROUPS,
+                         all_groups=all_groups_options,
                          lots=LOTS,
+                         year_lots=year_lots,
                          students=student_rows,
                          ungrouped_count=ungrouped_count,
                          unclaimed_count=unclaimed_count,
@@ -344,6 +379,73 @@ def admin_import_class_list():
     return redirect(url_for('admin_views.admin_manage_groups'))
 
 
+@admin_views.route('/admin/manage-groups/groups/create', methods=['POST'])
+@admin_required
+def admin_create_group_route():
+    year = get_current_year()
+    member_ids = request.form.getlist('member_ids')
+    approve = request.form.get('approve') == '1'
+    group, err = admin_create_group(
+        request.form.get('group_name'),
+        member_ids=member_ids,
+        approve=approve,
+        academic_year=year,
+    )
+    if err and not group:
+        flash(err, "failed")
+    elif err and group:
+        flash(err, "failed")
+        flash(f"Created {group.groupName}", "success")
+    else:
+        flash(f"Created {group.groupName}", "success")
+    return redirect(url_for('admin_views.admin_manage_groups'))
+
+
+@admin_views.route('/admin/manage-groups/groups/<int:group_id>/edit', methods=['POST'])
+@admin_required
+def admin_edit_group_route(group_id):
+    group = get_group(group_id)
+    if not group or group.academic_year != get_current_year():
+        flash("Group not found for this year", "failed")
+        return redirect(url_for('admin_views.admin_manage_groups'))
+
+    renamed, err = rename_group(group_id, request.form.get('group_name'))
+    if err:
+        flash(err, "failed")
+        return redirect(url_for('admin_views.admin_manage_groups'))
+
+    member_ids = request.form.getlist('member_ids')
+    _, mem_err = set_group_members(group_id, member_ids)
+    if mem_err:
+        flash(mem_err, "failed")
+        return redirect(url_for('admin_views.admin_manage_groups'))
+
+    lot_ids = request.form.getlist('lot_ids')
+    _, lot_err = set_group_lots(group_id, lot_ids)
+    if lot_err:
+        flash(lot_err, "failed")
+    else:
+        flash(f"Updated {renamed.groupName}", "success")
+    return redirect(url_for('admin_views.admin_manage_groups'))
+
+
+@admin_views.route('/admin/manage-groups/students/<int:student_id>/move', methods=['POST'])
+@admin_required
+def admin_move_student(student_id):
+    year = get_current_year()
+    raw = (request.form.get('group_id') or '').strip()
+    group_id = None if raw in ('', '0', 'none') else int(raw)
+    ok, err = move_student_to_group(student_id, group_id=group_id, academic_year=year)
+    if not ok:
+        flash(err or "Could not move student", "failed")
+    elif group_id is None:
+        flash("Student ungrouped", "success")
+    else:
+        group = get_group(group_id)
+        flash(f"Moved to {group.groupName if group else 'group'}", "success")
+    return redirect(url_for('admin_views.admin_manage_groups'))
+
+
 @admin_views.route('/admin/manage-groups/students/<int:student_id>/edit', methods=['POST'])
 @admin_required
 def admin_edit_class_student(student_id):
@@ -355,6 +457,15 @@ def admin_edit_class_student(student_id):
     )
     if err:
         flash(err, "failed")
+        return redirect(url_for('admin_views.admin_manage_groups'))
+
+    raw = (request.form.get('group_id') or '').strip()
+    group_id = None if raw in ('', '0', 'none') else int(raw)
+    ok, move_err = move_student_to_group(
+        student_id, group_id=group_id, academic_year=get_current_year()
+    )
+    if not ok:
+        flash(move_err or "Student details saved, but group could not be updated", "failed")
     else:
         flash(f"Updated {student.name}", "success")
     return redirect(url_for('admin_views.admin_manage_groups'))

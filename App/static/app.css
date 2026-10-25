@@ -716,6 +716,12 @@ body.app-shell {
   flex-shrink: 0;
 }
 
+.status-switch--block {
+  margin-left: 0;
+  align-self: flex-start;
+  max-width: 100%;
+}
+
 .status-switch-label {
   font-size: 0.7rem;
   font-weight: 700;

@@ -161,18 +161,6 @@ def parse_class_list_csv(file_storage):
     if not students:
         return None, ["CSV has no student rows"]
 
-    year = get_current_year()
-    for m in students:
-        if db.session.scalars(db.select(Student).filter_by(username=m["student_id"])).first():
-            errors.append(f"Student ID {m['student_id']} already exists")
-        if db.session.scalars(
-            db.select(Student).filter_by(email=m["email"], academic_year=year)
-        ).first():
-            errors.append(f"Email {m['email']} already exists for {year}")
-
-    if errors:
-        return None, errors
-
     return students, []
 
 
@@ -180,7 +168,8 @@ def import_class_list_from_csv(file_storage):
     """
     Import ungrouped, unclaimed student roster entries.
     Students claim accounts later via register (id + email match).
-    Returns (count, errors).
+    Existing IDs/emails for the year are skipped so re-uploads can fill gaps.
+    Returns (count, errors) where count is newly created rows.
     """
     students, errors = parse_class_list_csv(file_storage)
     if errors:
@@ -188,7 +177,18 @@ def import_class_list_from_csv(file_storage):
 
     try:
         year = get_current_year()
+        created = 0
         for m in students:
+            by_id = db.session.scalars(
+                db.select(Student).filter_by(username=m["student_id"])
+            ).first()
+            if by_id:
+                continue
+            by_email = db.session.scalars(
+                db.select(Student).filter_by(email=m["email"], academic_year=year)
+            ).first()
+            if by_email:
+                continue
             student = Student(
                 m["name"],
                 m["student_id"],
@@ -198,8 +198,14 @@ def import_class_list_from_csv(file_storage):
                 account_claimed=False,
             )
             db.session.add(student)
+            created += 1
+        if created == 0:
+            db.session.rollback()
+            return None, [
+                f"No new students to import — all {len(students)} rows already exist for {year}."
+            ]
         db.session.commit()
-        return len(students), []
+        return created, []
     except Exception as e:
         db.session.rollback()
         return None, [str(e)]
@@ -219,11 +225,17 @@ def import_groups_from_csv(file_storage):
         lot_iter = iter(get_unassigned_lots())
 
         year = get_current_year()
+        from .group import next_group_number, format_group_name
+
+        next_num = next_group_number(year)
         for group_name, members in groups.items():
-            group = Group(group_name, academic_year=year)
+            group = Group(
+                format_group_name(next_num, group_name),
+                academic_year=year,
+            )
             db.session.add(group)
             db.session.flush()
-            group.set_generated_name()
+            next_num += 1
 
             for m in members:
                 password = _generate_password()

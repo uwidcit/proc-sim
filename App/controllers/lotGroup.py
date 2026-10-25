@@ -90,6 +90,76 @@ def assign_exclusive_lots(group_id, count=2):
     return True, None
 
 
+def set_group_lots(group_id, lot_ids):
+    """
+    Replace exclusive lot ownership for a group (admin).
+    Lots taken from other groups are reassigned here; unchecked lots are released.
+    Returns (group, None) or (None, error_message).
+    """
+    from .group import get_group, approve_group
+
+    group = get_group(group_id)
+    if not group:
+        return None, "Group not found"
+
+    try:
+        desired = {int(x) for x in (lot_ids or []) if str(x).strip()}
+    except (TypeError, ValueError):
+        return None, "Invalid lot list"
+
+    year = group.academic_year
+    for lot_id in desired:
+        lot = db.session.get(Lot, lot_id)
+        if not lot or lot.academic_year != year:
+            return None, f"Lot {lot_id} is not in the {year} catalogue"
+
+    current = {
+        e.lotID
+        for e in db.session.scalars(
+            db.select(LotGroup).filter_by(groupID=group_id)
+        ).all()
+    }
+
+    for lot_id in current - desired:
+        remove_lotGroup(lot_id, group_id)
+
+    vacated_group_ids = set()
+    for lot_id in desired - current:
+        existing = db.session.scalars(
+            db.select(LotGroup).filter_by(lotID=lot_id)
+        ).first()
+        if existing:
+            if existing.groupID != group_id:
+                vacated_group_ids.add(existing.groupID)
+                existing.groupID = group_id
+        else:
+            db.session.add(LotGroup(lot_id, group_id))
+
+    db.session.flush()
+
+    for other_id in vacated_group_ids:
+        still = db.session.scalars(
+            db.select(LotGroup).filter_by(groupID=other_id)
+        ).first()
+        if not still:
+            other = get_group(other_id)
+            if other and other.status != "requested":
+                other.status = "requested"
+
+    remaining = db.session.scalars(
+        db.select(LotGroup).filter_by(groupID=group_id)
+    ).first()
+    if remaining:
+        if group.status == "requested":
+            approve_group(group_id)
+        else:
+            db.session.commit()
+    else:
+        db.session.commit()
+
+    return get_group(group_id), None
+
+
 def remove_lotGroup(lotID, groupID):
     entry = get_lotGroup(lotID, groupID)
     if entry and entry.groupID == int(groupID):

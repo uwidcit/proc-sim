@@ -12,6 +12,7 @@
     · <strong style="color:var(--ink);">{{ unclaimed_count }}</strong> unclaimed
   </span>
   <span style="flex:1"></span>
+  <button type="button" class="btn btn-primary" id="openCreateGroupBtn">Create group</button>
   <a class="btn btn-secondary" href="{{ url_for('admin_views.admin_import_groups') }}">Import grouped CSV</a>
 </div>
 
@@ -21,7 +22,7 @@
       <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.35rem;">Class list · {{ academic_year }}</h2>
       <p style="margin:0; font-size:0.8rem; color:var(--ink-muted); line-height:1.45;">
         Only students for the current year. Upload CSV (<code>student_id,name,email</code>);
-        they claim accounts by matching ID and email.
+        they claim accounts by matching ID and email. Use Move to place students into groups.
       </p>
     </div>
     {% if students %}
@@ -85,11 +86,19 @@
               <div style="display:inline-flex; gap:0.35rem; flex-wrap:wrap; justify-content:center;">
                 <button
                   type="button"
+                  class="btn btn-secondary move-student-btn"
+                  data-id="{{ s.id }}"
+                  data-name="{{ s.name|e }}"
+                  data-group-id="{{ s.group_id or '' }}"
+                >Move</button>
+                <button
+                  type="button"
                   class="btn btn-secondary edit-student-btn"
                   data-id="{{ s.id }}"
                   data-name="{{ s.name|e }}"
                   data-student-id="{{ s.student_id|e }}"
                   data-email="{{ s.email|e }}"
+                  data-group-id="{{ s.group_id or '' }}"
                 >Edit</button>
                 <button
                   type="button"
@@ -132,6 +141,14 @@
           {% endfor %}
         </ul>
         <div style="display:flex; flex-direction:column; gap:0.4rem; margin-top:auto;">
+          <button
+            type="button"
+            class="btn btn-secondary edit-group-btn"
+            data-group-id="{{ request.id }}"
+            data-display-name="{{ request.display_name|e }}"
+            data-member-ids="{{ request.member_ids|join(',') }}"
+            data-lot-ids="{{ request.lots|join(',') }}"
+          >Edit</button>
           <button type="button" class="btn btn-primary approve-btn" data-group-id="{{ request.id }}">Approve (auto-assign)</button>
           <button type="button" class="btn btn-danger decline-btn" data-group-id="{{ request.id }}">Reject</button>
         </div>
@@ -144,27 +161,43 @@
 </section>
 
 <section>
-  <h2 class="font-heading" style="font-size:1rem; margin:0 0 0.65rem;">Confirmed groups</h2>
-  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); gap:0.75rem;">
+  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.65rem; margin-bottom:0.65rem;">
+    <h2 class="font-heading" style="font-size:1rem; margin:0;">Confirmed groups</h2>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(15rem,1fr)); gap:0.75rem;">
     {% if groups %}
       {% for group in groups %}
-      <article class="surface" style="padding:1rem; display:flex; flex-direction:column; gap:0.85rem;">
+      <article class="surface" style="padding:1rem; display:flex; flex-direction:column; gap:0.85rem; min-width:0; overflow:hidden;">
         <div>
-          <div class="font-heading" style="font-weight:700;">{{ group.name }}</div>
+          <div class="font-heading" style="font-weight:700; overflow-wrap:anywhere;">{{ group.name }}</div>
         </div>
         <ul style="margin:0; padding-left:1.1rem; font-size:0.8rem; color:var(--ink-muted);">
           {% for member in group.members %}
           <li>{{ member.name }} ({{ member.id }})</li>
+          {% else %}
+          <li style="list-style:none; margin-left:-1.1rem;">No members yet</li>
           {% endfor %}
         </ul>
         <div style="display:flex; flex-wrap:wrap; gap:0.35rem;">
           {% for lot in group.lots %}
           <span class="badge badge-accent">Lot {{ lot }}</span>
+          {% else %}
+          <span style="font-size:0.75rem; color:var(--ink-muted);">No lots</span>
           {% endfor %}
         </div>
-        <div style="display:flex; align-items:center; gap:0.5rem; margin-top:auto;">
-          <button type="button" class="btn btn-danger remove-btn" data-group-id="{{ group.id }}">Remove</button>
-          <label class="status-switch" title="Toggle pending / confirmed">
+        <div style="display:flex; flex-direction:column; gap:0.55rem; margin-top:auto;">
+          <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+            <button
+              type="button"
+              class="btn btn-secondary edit-group-btn"
+              data-group-id="{{ group.id }}"
+              data-display-name="{{ group.display_name|e }}"
+              data-member-ids="{{ group.member_ids|join(',') }}"
+              data-lot-ids="{{ group.lots|join(',') }}"
+            >Edit</button>
+            <button type="button" class="btn btn-danger remove-btn" data-group-id="{{ group.id }}">Remove</button>
+          </div>
+          <label class="status-switch status-switch--block" title="Toggle pending / confirmed">
             <span class="status-switch-label is-pending">Pending</span>
             <input
               type="checkbox"
@@ -212,9 +245,108 @@
         Email
         <input class="field" style="margin-top:0.35rem;" type="email" name="email" id="editStudentEmail" required maxlength="120" />
       </label>
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Group
+        <select class="field" style="margin-top:0.35rem;" name="group_id" id="editStudentGroup">
+          <option value="">Ungrouped</option>
+          {% for g in all_groups %}
+          <option value="{{ g.id }}">{{ g.name }}{% if g.status == 'requested' %} (pending){% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
       <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.25rem;">
         <button type="button" class="btn btn-secondary" onclick="hideEditStudentModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="moveStudentModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="padding:1.25rem; max-width:24rem; width:calc(100% - 2rem);">
+    <h3 class="font-heading" style="margin:0 0 0.35rem; font-size:1.05rem;">Move student</h3>
+    <p id="moveStudentLabel" style="margin:0 0 0.85rem; font-size:0.875rem; color:var(--ink-muted);"></p>
+    <form id="moveStudentForm" method="POST" style="display:flex; flex-direction:column; gap:0.75rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Destination group
+        <select class="field" style="margin-top:0.35rem;" name="group_id" id="moveStudentGroup">
+          <option value="">Ungrouped</option>
+          {% for g in all_groups %}
+          <option value="{{ g.id }}">{{ g.name }}{% if g.status == 'requested' %} (pending){% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.25rem;">
+        <button type="button" class="btn btn-secondary" onclick="hideMoveStudentModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Move</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="groupModal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center; background:rgba(20,33,43,0.45);">
+  <div class="surface" style="padding:1.25rem; max-width:28rem; width:calc(100% - 2rem); max-height:calc(100vh - 2rem); overflow:auto;">
+    <h3 id="groupModalTitle" class="font-heading" style="margin:0 0 0.85rem; font-size:1.05rem;">Create group</h3>
+    <form id="groupForm" method="POST" style="display:flex; flex-direction:column; gap:0.75rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <label style="font-size:0.75rem; font-weight:650; color:var(--ink-muted);">
+        Group name
+        <input class="field" style="margin-top:0.35rem;" type="text" name="group_name" id="groupNameInput" required maxlength="40" placeholder="e.g. AlphaLab" />
+      </label>
+      <p style="margin:0; font-size:0.75rem; color:var(--ink-muted);">Number (G1, G2, …) is assigned automatically for this year and kept when you rename.</p>
+      <div>
+        <div style="font-size:0.75rem; font-weight:650; color:var(--ink-muted); margin-bottom:0.35rem;">Members</div>
+        <div class="surface" style="padding:0.5rem 0.65rem; max-height:12rem; overflow:auto; display:flex; flex-direction:column; gap:0.35rem;">
+          {% if students %}
+            {% for s in students %}
+            <label style="display:flex; gap:0.5rem; align-items:start; font-size:0.8rem; color:var(--ink);">
+              <input type="checkbox" name="member_ids" value="{{ s.id }}" class="group-member-check" style="margin-top:0.15rem;" />
+              <span>
+                {{ s.name }}
+                <span style="color:var(--ink-muted);">({{ s.student_id }})</span>
+                {% if s.group %}
+                <span style="color:var(--ink-muted);">· {{ s.group }}</span>
+                {% endif %}
+              </span>
+            </label>
+            {% endfor %}
+          {% else %}
+            <span style="font-size:0.8rem; color:var(--ink-muted);">No students on the class list yet.</span>
+          {% endif %}
+        </div>
+        <p style="margin:0.35rem 0 0; font-size:0.75rem; color:var(--ink-muted);">Selecting a student already in another group moves them here.</p>
+      </div>
+      <div id="groupLotsBlock" style="display:none;">
+        <div style="font-size:0.75rem; font-weight:650; color:var(--ink-muted); margin-bottom:0.35rem;">Lots</div>
+        <div class="surface" style="padding:0.5rem 0.65rem; max-height:10rem; overflow:auto; display:flex; flex-direction:column; gap:0.35rem;">
+          {% if year_lots %}
+            {% for lot in year_lots %}
+            <label style="display:flex; gap:0.5rem; align-items:start; font-size:0.8rem; color:var(--ink);">
+              <input type="checkbox" name="lot_ids" value="{{ lot.id }}" class="group-lot-check" style="margin-top:0.15rem;" />
+              <span>
+                {{ lot.name }}
+                {% if lot.group_name %}
+                <span style="color:var(--ink-muted);">· {{ lot.group_name }}</span>
+                {% else %}
+                <span style="color:var(--ink-muted);">· free</span>
+                {% endif %}
+              </span>
+            </label>
+            {% endfor %}
+          {% else %}
+            <span style="font-size:0.8rem; color:var(--ink-muted);">No lots for {{ academic_year }} yet.</span>
+          {% endif %}
+        </div>
+        <p style="margin:0.35rem 0 0; font-size:0.75rem; color:var(--ink-muted);">Selecting a lot owned by another group moves it here. Unchecking releases it.</p>
+      </div>
+      <label id="groupApproveRow" style="display:flex; gap:0.5rem; align-items:center; font-size:0.8rem; color:var(--ink);">
+        <input type="checkbox" name="approve" value="1" id="groupApproveCheck" />
+        Approve and auto-assign 2 lots
+      </label>
+      <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.25rem;">
+        <button type="button" class="btn btn-secondary" onclick="hideGroupModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="groupSubmitBtn">Create</button>
       </div>
     </form>
   </div>
@@ -228,8 +360,7 @@ function showConfirmModal(title, message, form, toggle) {
   pendingToggle = toggle || null;
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmMessage').textContent = message;
-  const modal = document.getElementById('confirmModal');
-  modal.style.display = 'flex';
+  document.getElementById('confirmModal').style.display = 'flex';
 }
 function hideConfirmModal() {
   if (pendingToggle) {
@@ -242,13 +373,58 @@ function hideConfirmModal() {
 function hideEditStudentModal() {
   document.getElementById('editStudentModal').style.display = 'none';
 }
+function hideMoveStudentModal() {
+  document.getElementById('moveStudentModal').style.display = 'none';
+}
+function hideGroupModal() {
+  document.getElementById('groupModal').style.display = 'none';
+}
 function csrfInput() {
   const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
   const input = document.createElement('input');
   input.type = 'hidden'; input.name = 'csrf_token'; input.value = token;
   return input;
 }
+function setMemberChecks(ids) {
+  const wanted = new Set((ids || []).map(String));
+  document.querySelectorAll('.group-member-check').forEach(function (cb) {
+    cb.checked = wanted.has(String(cb.value));
+  });
+}
+function setLotChecks(ids) {
+  const wanted = new Set((ids || []).map(String));
+  document.querySelectorAll('.group-lot-check').forEach(function (cb) {
+    cb.checked = wanted.has(String(cb.value));
+  });
+}
+function openCreateGroupModal() {
+  const form = document.getElementById('groupForm');
+  form.action = '{{ url_for("admin_views.admin_create_group_route") }}';
+  document.getElementById('groupModalTitle').textContent = 'Create group';
+  document.getElementById('groupSubmitBtn').textContent = 'Create';
+  document.getElementById('groupNameInput').value = '';
+  document.getElementById('groupApproveRow').style.display = 'flex';
+  document.getElementById('groupApproveCheck').checked = false;
+  document.getElementById('groupLotsBlock').style.display = 'none';
+  setMemberChecks([]);
+  setLotChecks([]);
+  document.getElementById('groupModal').style.display = 'flex';
+}
+function openEditGroupModal(groupId, displayName, memberIdsCsv, lotIdsCsv) {
+  const form = document.getElementById('groupForm');
+  form.action = `/admin/manage-groups/groups/${groupId}/edit`;
+  document.getElementById('groupModalTitle').textContent = 'Edit group';
+  document.getElementById('groupSubmitBtn').textContent = 'Save';
+  document.getElementById('groupNameInput').value = displayName || '';
+  document.getElementById('groupApproveRow').style.display = 'none';
+  document.getElementById('groupApproveCheck').checked = false;
+  document.getElementById('groupLotsBlock').style.display = 'block';
+  setMemberChecks((memberIdsCsv || '').split(',').filter(Boolean));
+  setLotChecks((lotIdsCsv || '').split(',').filter(Boolean));
+  document.getElementById('groupModal').style.display = 'flex';
+}
 window.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('openCreateGroupBtn').addEventListener('click', openCreateGroupModal);
   document.querySelectorAll('.approve-btn').forEach(function (btn) {
     btn.addEventListener('click', function (e) {
       const form = document.createElement('form');
@@ -293,6 +469,27 @@ window.addEventListener('DOMContentLoaded', function () {
       showConfirmModal('Remove group?', 'Permanently removes the group and related data.', form);
     });
   });
+  document.querySelectorAll('.edit-group-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const el = e.currentTarget;
+      openEditGroupModal(
+        el.dataset.groupId,
+        el.dataset.displayName,
+        el.dataset.memberIds,
+        el.dataset.lotIds
+      );
+    });
+  });
+  document.querySelectorAll('.move-student-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      const el = e.currentTarget;
+      const form = document.getElementById('moveStudentForm');
+      form.action = `/admin/manage-groups/students/${el.dataset.id}/move`;
+      document.getElementById('moveStudentLabel').textContent = el.dataset.name || '';
+      document.getElementById('moveStudentGroup').value = el.dataset.groupId || '';
+      document.getElementById('moveStudentModal').style.display = 'flex';
+    });
+  });
   document.querySelectorAll('.edit-student-btn').forEach(function (btn) {
     btn.addEventListener('click', function (e) {
       const el = e.currentTarget;
@@ -301,6 +498,7 @@ window.addEventListener('DOMContentLoaded', function () {
       document.getElementById('editStudentName').value = el.dataset.name || '';
       document.getElementById('editStudentId').value = el.dataset.studentId || '';
       document.getElementById('editStudentEmail').value = el.dataset.email || '';
+      document.getElementById('editStudentGroup').value = el.dataset.groupId || '';
       document.getElementById('editStudentModal').style.display = 'flex';
     });
   });
