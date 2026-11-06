@@ -159,17 +159,40 @@ def assemble_rfp_specs(form):
     ram = " · ".join(ram_parts)
 
     drive_ifaces = form.getlist("drive_iface")
-    drive_min = int(_num(form.get("drive_min"), 256))
-    drive_max = int(_num(form.get("drive_max"), 512))
-    if drive_min > drive_max:
-        drive_min, drive_max = drive_max, drive_min
-    dtype = "/".join(drive_ifaces) if drive_ifaces else "Storage"
-    if drive_min >= 1024 or drive_max >= 1024:
-        def fmt_gb(n):
-            return f"{n / 1024:g} TB" if n >= 1024 and n % 1024 == 0 else f"{n} GB"
-        cap = f"{fmt_gb(drive_min)}–{fmt_gb(drive_max)}" if drive_min != drive_max else fmt_gb(drive_min)
+    drive_unit = (form.get("drive_unit") or "GB").strip().upper()
+    if drive_unit not in ("GB", "TB"):
+        drive_unit = "GB"
+    raw_min = _num(form.get("drive_min"), 1.0 if drive_unit == "TB" else 256)
+    raw_max = _num(form.get("drive_max"), 2.0 if drive_unit == "TB" else 512)
+    if raw_min > raw_max:
+        raw_min, raw_max = raw_max, raw_min
+    if drive_unit == "TB":
+        drive_min = int(round(raw_min * 1024))
+        drive_max = int(round(raw_max * 1024))
     else:
-        cap = f"{drive_min}–{drive_max} GB" if drive_min != drive_max else f"{drive_min} GB"
+        drive_min = int(round(raw_min))
+        drive_max = int(round(raw_max))
+    dtype = "/".join(drive_ifaces) if drive_ifaces else "Storage"
+    use_tb = drive_unit == "TB" or (
+        drive_min >= 1024
+        and drive_max >= 1024
+        and drive_min % 512 == 0
+        and drive_max % 512 == 0
+    )
+
+    def fmt_one(n_gb):
+        if n_gb >= 1024 and n_gb % 512 == 0:
+            return f"{n_gb / 1024:g} TB"
+        return f"{n_gb} GB"
+
+    if drive_min == drive_max:
+        cap = fmt_one(drive_min)
+    elif use_tb and drive_min % 512 == 0 and drive_max % 512 == 0:
+        cap = f"{drive_min / 1024:g}–{drive_max / 1024:g} TB"
+    elif drive_min < 1024 and drive_max < 1024:
+        cap = f"{drive_min}–{drive_max} GB"
+    else:
+        cap = f"{fmt_one(drive_min)}–{fmt_one(drive_max)}"
     drive = f"{dtype} · {cap}"
     if form.get("drive_secondary"):
         drive += " + secondary storage"
@@ -248,6 +271,7 @@ def parse_rfp_ui(rfp_form):
         "ram_speed_min": 3200,
         "ram_speed_max": 5600,
         "drive_ifaces": [],
+        "drive_unit": "GB",
         "drive_min": 256,
         "drive_max": 512,
         "drive_secondary": False,
@@ -324,10 +348,11 @@ def parse_rfp_ui(rfp_form):
     drive = rfp_form.get("drive") or ""
     ui["drive_ifaces"] = [t for t in DRIVE_INTERFACES if t in drive]
     ui["drive_secondary"] = "secondary" in drive.lower()
-    # normalize TB to GB for slider
-    def to_gb(n, unit):
-        return int(float(n) * 1024) if unit.upper().startswith("T") else int(float(n))
 
+    def to_gb(n, unit):
+        return int(round(float(n) * 1024)) if unit.upper().startswith("T") else int(round(float(n)))
+
+    min_gb = max_gb = None
     # Match assemble formats: "256–512 GB", "1–2 TB", "512 GB–1 TB", "1 TB"
     m = re.search(
         r'(\d+(?:\.\d+)?)\s*(GB|TB)\s*[–-]\s*(\d+(?:\.\d+)?)\s*(GB|TB)',
@@ -335,8 +360,8 @@ def parse_rfp_ui(rfp_form):
         re.I,
     )
     if m:
-        ui["drive_min"] = to_gb(m.group(1), m.group(2))
-        ui["drive_max"] = to_gb(m.group(3), m.group(4))
+        min_gb = to_gb(m.group(1), m.group(2))
+        max_gb = to_gb(m.group(3), m.group(4))
     else:
         m = re.search(
             r'(\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)\s*(GB|TB)',
@@ -345,12 +370,28 @@ def parse_rfp_ui(rfp_form):
         )
         if m:
             unit = m.group(3)
-            ui["drive_min"] = to_gb(m.group(1), unit)
-            ui["drive_max"] = to_gb(m.group(2), unit)
+            min_gb = to_gb(m.group(1), unit)
+            max_gb = to_gb(m.group(2), unit)
         else:
             m = re.search(r'(\d+(?:\.\d+)?)\s*(GB|TB)', drive, re.I)
             if m:
-                ui["drive_min"] = ui["drive_max"] = to_gb(m.group(1), m.group(2))
+                min_gb = max_gb = to_gb(m.group(1), m.group(2))
+
+    if min_gb is not None and max_gb is not None:
+        # Prefer TB UI when values land cleanly on half-TB steps
+        if (
+            max_gb >= 1024
+            and min_gb % 512 == 0
+            and max_gb % 512 == 0
+            and ("TB" in drive.upper() or min_gb >= 1024)
+        ):
+            ui["drive_unit"] = "TB"
+            ui["drive_min"] = min_gb / 1024
+            ui["drive_max"] = max_gb / 1024
+        else:
+            ui["drive_unit"] = "GB"
+            ui["drive_min"] = min_gb
+            ui["drive_max"] = max_gb
 
     gpu = rfp_form.get("gpu") or ""
     if re.search(r"\bintegrated\b", gpu, re.I):

@@ -376,22 +376,23 @@ def student_lots_page():
         from App.controllers.rfp_form import assemble_rfp_specs
 
         specs = assemble_rfp_specs(request.form)
-        if not specs.get("deviceType"):
-            flash("Select a device type", "failed")
-            return redirect(url_for('student_views.student_lots_page', selected_lot=lot_id))
 
         if action == 'submit':
+            if not specs.get("deviceType"):
+                flash("Select a device type before submitting", "failed")
+                return redirect(url_for('student_views.student_lots_page', selected_lot=lot_id))
             rfp, err = submit_rfp(yourGroup.id, lot_id, **specs)
             if err:
                 flash(err, "info")
             else:
                 flash(f"RFP for Lot {lot_id} has been submitted and is now visible in the gallery!", "success")
         else:
+            # Drafts may be incomplete — do not require every field yet
             rfp, err = save_rfp_draft(yourGroup.id, lot_id, **specs)
             if err:
                 flash(err, "info")
             else:
-                flash(f"Draft for Lot {lot_id} saved successfully.", "info")
+                flash("Draft saved.", "success")
 
         return redirect(url_for('student_views.student_lots_page', selected_lot=lot_id))
 

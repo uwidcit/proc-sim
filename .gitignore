@@ -166,3 +166,6 @@ instance_tracker.txt
 # Local EasyPanel / deploy SSH credentials (never commit)
 .easypanel-ssh.txt
 easypanel-ssh.txt
+
+# Local deploy / prod helper scripts
+scripts/

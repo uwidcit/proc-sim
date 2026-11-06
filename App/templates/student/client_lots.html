@@ -189,6 +189,12 @@
   </fieldset>
 
   {# ── Drive ── #}
+  {% set drive_unit = rfp_ui.drive_unit if rfp_ui.drive_unit in ['GB', 'TB'] else 'GB' %}
+  {% if drive_unit == 'TB' %}
+    {% set drive_scale_min, drive_scale_max, drive_scale_step = 1, 16, 0.5 %}
+  {% else %}
+    {% set drive_scale_min, drive_scale_max, drive_scale_step = 128, 4096, 128 %}
+  {% endif %}
   <fieldset class="rfp-section">
     <legend>Hard drive / storage</legend>
     <p class="chip-label">Interface <span style="font-weight:500;">(optional)</span></p>
@@ -200,20 +206,44 @@
       </label>
       {% endfor %}
     </div>
-    <div class="range-block" style="margin-top:0.75rem;" data-range-pair data-decimals="0" data-unit=" GB" data-drive-fmt data-sync-numbers>
+    <p class="chip-label">Capacity unit</p>
+    <div class="chip-row" role="radiogroup" aria-label="Storage capacity unit" data-drive-unit-group>
+      <label class="chip {% if drive_unit == 'GB' %}is-on{% endif %}">
+        <input type="radio" name="drive_unit" value="GB" {% if drive_unit == 'GB' %}checked{% endif %} data-drive-unit />
+        GB
+      </label>
+      <label class="chip {% if drive_unit == 'TB' %}is-on{% endif %}">
+        <input type="radio" name="drive_unit" value="TB" {% if drive_unit == 'TB' %}checked{% endif %} data-drive-unit />
+        TB
+      </label>
+    </div>
+    <div
+      class="range-block"
+      style="margin-top:0.75rem;"
+      data-range-pair
+      data-drive-capacity
+      data-decimals="{{ 1 if drive_unit == 'TB' else 0 }}"
+      data-sync-numbers
+      data-unit-gb-min="128"
+      data-unit-gb-max="4096"
+      data-unit-gb-step="128"
+      data-unit-tb-min="1"
+      data-unit-tb-max="16"
+      data-unit-tb-step="0.5"
+    >
       <div class="range-caption">Capacity range</div>
       <div class="range-inputs">
-        <label>Min <input class="field range-num" type="number" min="128" max="4096" step="128" value="{{ rfp_ui.drive_min }}" data-num="min" /></label>
+        <label>Min <input class="field range-num" type="number" min="{{ drive_scale_min }}" max="{{ drive_scale_max }}" step="{{ drive_scale_step }}" value="{{ rfp_ui.drive_min }}" data-num="min" /></label>
         <span class="range-sep">to</span>
-        <label>Max <input class="field range-num" type="number" min="128" max="4096" step="128" value="{{ rfp_ui.drive_max }}" data-num="max" /></label>
-        <span class="range-unit">GB</span>
+        <label>Max <input class="field range-num" type="number" min="{{ drive_scale_min }}" max="{{ drive_scale_max }}" step="{{ drive_scale_step }}" value="{{ rfp_ui.drive_max }}" data-num="max" /></label>
+        <span class="range-unit" data-drive-unit-label>{{ drive_unit }}</span>
       </div>
       <div class="dual-range">
         <div class="dual-range-track" aria-hidden="true"><span class="dual-range-fill"></span></div>
-        <input type="range" name="drive_min" min="128" max="4096" step="128" value="{{ rfp_ui.drive_min }}" data-range="min" />
-        <input type="range" name="drive_max" min="128" max="4096" step="128" value="{{ rfp_ui.drive_max }}" data-range="max" />
+        <input type="range" name="drive_min" min="{{ drive_scale_min }}" max="{{ drive_scale_max }}" step="{{ drive_scale_step }}" value="{{ rfp_ui.drive_min }}" data-range="min" />
+        <input type="range" name="drive_max" min="{{ drive_scale_min }}" max="{{ drive_scale_max }}" step="{{ drive_scale_step }}" value="{{ rfp_ui.drive_max }}" data-range="max" />
       </div>
-      <span class="field-hint">Enter or slide min/max capacity (values ≥ 1024 GB display as TB in the RFP)</span>
+      <span class="field-hint">Switch GB/TB to change the slider scale and step (GB: 128–4096 step 128 · TB: 1–16 step 0.5)</span>
     </div>
     <label class="check-line">
       <input type="checkbox" name="drive_secondary" value="1" {% if rfp_ui.drive_secondary %}checked{% endif %} />
@@ -321,7 +351,7 @@
 
   <footer class="lot-rfp-footer">
     <div class="btn-row-mobile" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
-      <button type="submit" name="action" value="save" class="btn btn-secondary">Save draft</button>
+      <button type="submit" name="action" value="save" class="btn btn-secondary" formnovalidate>Save draft</button>
       <button type="submit" name="action" value="submit" class="btn btn-primary">Submit final RFP</button>
     </div>
   </footer>
@@ -551,10 +581,10 @@
     const x = Number(n);
     return decimals > 0 ? x.toFixed(decimals) : String(Math.round(x));
   }
-  function fmtDrive(n) {
-    n = Number(n);
-    if (n >= 1024 && n % 1024 === 0) return (n / 1024) + " TB";
-    return n + " GB";
+
+  function snap(n, step, decimals) {
+    const s = Math.round(n / step) * step;
+    return Number(s.toFixed(decimals));
   }
 
   document.querySelectorAll("[data-range-pair]").forEach((block) => {
@@ -564,8 +594,12 @@
     const numMax = block.querySelector('[data-num="max"]');
     const outMin = block.querySelector("[data-out-min]");
     const outMax = block.querySelector("[data-out-max]");
-    const decimals = Number(block.dataset.decimals || 0);
-    const driveFmt = block.hasAttribute("data-drive-fmt");
+    const fill = block.querySelector(".dual-range-fill");
+    const wrap = block.querySelector(".dual-range");
+
+    function decimals() {
+      return Number(block.dataset.decimals || 0);
+    }
 
     function clampPair(a, b, preferMin) {
       if (a > b) {
@@ -577,25 +611,10 @@
 
     function writeOut(a, b) {
       if (!outMin || !outMax) return;
-      if (driveFmt) {
-        if (a < 1024 && b < 1024) {
-          outMin.textContent = Math.round(a);
-          outMax.textContent = Math.round(b) + " GB";
-        } else if (a >= 1024 && b >= 1024) {
-          outMin.textContent = a / 1024;
-          outMax.textContent = b / 1024 + " TB";
-        } else {
-          outMin.textContent = fmtDrive(a);
-          outMax.textContent = fmtDrive(b);
-        }
-      } else {
-        outMin.textContent = fmt(a, decimals);
-        outMax.textContent = fmt(b, decimals);
-      }
+      const d = decimals();
+      outMin.textContent = fmt(a, d);
+      outMax.textContent = fmt(b, d);
     }
-
-    const fill = block.querySelector(".dual-range-fill");
-    const wrap = block.querySelector(".dual-range");
 
     function paintFill(a, b) {
       if (!fill || !minEl) return;
@@ -606,7 +625,6 @@
       const right = ((b - lo) / span) * 100;
       fill.style.left = left + "%";
       fill.style.width = Math.max(0, right - left) + "%";
-      // Prefer the nearer thumb under the pointer
       if (wrap) {
         const mid = (left + right) / 2;
         minEl.style.zIndex = "4";
@@ -616,8 +634,10 @@
     }
 
     function fromSliders(preferMin) {
-      let a = Number(minEl.value);
-      let b = Number(maxEl.value);
+      const d = decimals();
+      const step = Number(minEl.step) || 1;
+      let a = snap(Number(minEl.value), step, d);
+      let b = snap(Number(maxEl.value), step, d);
       [a, b] = clampPair(a, b, preferMin);
       minEl.value = a;
       maxEl.value = b;
@@ -632,14 +652,15 @@
       const lo = Number(minEl.min);
       const hi = Number(minEl.max);
       const step = Number(minEl.step) || 1;
+      const d = decimals();
       let a = Number(numMin.value);
       let b = Number(numMax.value);
       if (Number.isNaN(a)) a = lo;
       if (Number.isNaN(b)) b = hi;
       a = Math.min(hi, Math.max(lo, a));
       b = Math.min(hi, Math.max(lo, b));
-      a = Math.round(a / step) * step;
-      b = Math.round(b / step) * step;
+      a = snap(a, step, d);
+      b = snap(b, step, d);
       [a, b] = clampPair(a, b, preferMin);
       numMin.value = a;
       numMax.value = b;
@@ -648,6 +669,30 @@
       writeOut(a, b);
       paintFill(a, b);
     }
+
+    function applyScale(scale, values) {
+      const d = scale.decimals;
+      block.dataset.decimals = String(d);
+      [minEl, maxEl, numMin, numMax].forEach((el) => {
+        if (!el) return;
+        el.min = scale.min;
+        el.max = scale.max;
+        el.step = scale.step;
+      });
+      let a = values[0];
+      let b = values[1];
+      a = snap(Math.min(scale.max, Math.max(scale.min, a)), scale.step, d);
+      b = snap(Math.min(scale.max, Math.max(scale.min, b)), scale.step, d);
+      if (a > b) [a, b] = [b, a];
+      minEl.value = a;
+      maxEl.value = b;
+      if (numMin) numMin.value = a;
+      if (numMax) numMax.value = b;
+      writeOut(a, b);
+      paintFill(a, b);
+    }
+
+    block._rangeApi = { fromSliders, fromNumbers, applyScale, minEl, maxEl, numMin, numMax };
 
     if (wrap) {
       wrap.addEventListener("pointerdown", (e) => {
@@ -674,6 +719,56 @@
     }
     fromSliders(true);
   });
+
+  // Hard drive GB/TB unit toggle — rescale slider + number inputs
+  const driveBlock = document.querySelector("[data-drive-capacity]");
+  const driveUnitGroup = document.querySelector("[data-drive-unit-group]");
+  if (driveBlock && driveUnitGroup && driveBlock._rangeApi) {
+    const label = driveBlock.querySelector("[data-drive-unit-label]");
+    function scaleFor(unit) {
+      if (unit === "TB") {
+        return {
+          min: Number(driveBlock.dataset.unitTbMin || 1),
+          max: Number(driveBlock.dataset.unitTbMax || 16),
+          step: Number(driveBlock.dataset.unitTbStep || 0.5),
+          decimals: 1,
+        };
+      }
+      return {
+        min: Number(driveBlock.dataset.unitGbMin || 128),
+        max: Number(driveBlock.dataset.unitGbMax || 4096),
+        step: Number(driveBlock.dataset.unitGbStep || 128),
+        decimals: 0,
+      };
+    }
+    function currentValues() {
+      return [
+        Number(driveBlock._rangeApi.minEl.value),
+        Number(driveBlock._rangeApi.maxEl.value),
+      ];
+    }
+    driveUnitGroup.querySelectorAll("[data-drive-unit]").forEach((input) => {
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        const next = input.value;
+        const prev = label ? label.textContent.trim() : "GB";
+        let [a, b] = currentValues();
+        if (prev === "GB" && next === "TB") {
+          a = a / 1024;
+          b = b / 1024;
+        } else if (prev === "TB" && next === "GB") {
+          a = a * 1024;
+          b = b * 1024;
+        }
+        if (label) label.textContent = next;
+        driveUnitGroup.querySelectorAll(".chip").forEach((chip) => {
+          const radio = chip.querySelector("[data-drive-unit]");
+          chip.classList.toggle("is-on", !!(radio && radio.checked));
+        });
+        driveBlock._rangeApi.applyScale(scaleFor(next), [a, b]);
+      });
+    });
+  }
 
   // Chip toggle class
   document.querySelectorAll(".chip input").forEach((input) => {
