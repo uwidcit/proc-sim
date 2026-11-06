@@ -23,7 +23,7 @@
         <h2 class="font-heading" style="margin:0; font-size:1.15rem; font-weight:700;">
           {% if is_locked %}RFP for {{ current_lot.name or ('Lot ' ~ current_lot.id) }}{% else %}Create RFP for {{ current_lot.name or ('Lot ' ~ current_lot.id) }}{% endif %}
         </h2>
-        <div style="font-size:0.8rem; color:var(--ink-muted); margin-top:0.25rem;">
+        <div class="lot-toolbar-sub">
           {{ current_lot.labType }} · {{ current_lot.labSize }} · {{ current_lot.numMachines }} machines
           {% if current_lot.labTypeObj %} · {{ current_lot.labTypeObj.description }}{% endif %}
         </div>
@@ -283,8 +283,8 @@
 
       <div class="range-block">
         <div class="range-caption">Required resolution range</div>
-        <div class="range-inputs" data-gpu-res-pair>
-          <label style="flex:1; min-width:8rem;">
+        <div class="range-inputs range-inputs-stack" data-gpu-res-pair>
+          <label class="range-grow">
             Min
             <select class="field" name="gpu_res_min" required>
               <option value="" disabled {% if not rfp_ui.gpu_res_min %}selected{% endif %}>Select…</option>
@@ -294,7 +294,7 @@
             </select>
           </label>
           <span class="range-sep">to</span>
-          <label style="flex:1; min-width:8rem;">
+          <label class="range-grow">
             Max
             <select class="field" name="gpu_res_max" required>
               <option value="" disabled {% if not rfp_ui.gpu_res_max %}selected{% endif %}>Select…</option>
@@ -364,68 +364,126 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 .shell-pane-inner.lot-rfp-pane {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 0;
   max-width: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 .lot-rfp-page {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 .lot-rfp-chrome {
   flex-shrink: 0;
   padding: 0.85rem 1.1rem 0.65rem;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
+  min-width: 0;
 }
-.lot-rfp-chrome .tabs { margin-bottom: 0.65rem; }
-.lot-toolbar { margin: 0; padding: 0; background: transparent; border: 0; }
-.lot-toolbar-meta { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem 0.75rem; }
+.lot-rfp-chrome .tabs { margin-bottom: 0.65rem; max-width: 100%; }
+.lot-toolbar {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.65rem 1rem;
+  min-width: 0;
+  width: 100%;
+}
+.lot-toolbar > div:first-child { min-width: 0; flex: 1 1 12rem; max-width: 100%; }
+.lot-toolbar-sub {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-top: 0.25rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.lot-toolbar-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  flex: 0 1 auto;
+  min-width: 0;
+}
 .rfp-title-tip {
   margin: 0.45rem 0 0;
   font-size: 0.8rem;
   color: var(--ink-muted);
   line-height: 1.4;
   max-width: 40rem;
+  overflow-wrap: anywhere;
 }
 .lot-rfp-form-shell {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
 }
 .lot-rfp-scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 0.85rem 1.1rem 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .lot-rfp-footer {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1.1rem;
   background: var(--surface);
   border-top: 1px solid var(--line);
   box-shadow: 0 -6px 16px rgba(20, 33, 43, 0.04);
+  min-width: 0;
 }
-.field-hint { display:block; margin-top:0.35rem; font-size:0.7rem; font-weight:500; color:var(--ink-muted); line-height:1.35; }
+.field-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .rfp-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem 1.25rem;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
-.rfp-span-all { grid-column: 1 / -1; }
+.rfp-span-all { grid-column: 1 / -1; min-width: 0; }
 .rfp-section {
   margin: 0;
   padding: 0.9rem 1rem;
@@ -433,6 +491,9 @@
   border-radius: var(--radius);
   background: var(--surface);
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 .rfp-section legend {
   padding: 0 0.25rem;
@@ -444,12 +505,30 @@
   background: var(--surface);
 }
 .chip-label { margin: 0.65rem 0 0.35rem; font-size: 0.7rem; font-weight: 650; color: var(--ink-muted); }
-.chip-row { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.5rem; }
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  max-width: 100%;
+  min-width: 0;
+}
 .chip {
-  display:inline-flex; align-items:center; gap:0.35rem;
-  padding: 0.4rem 0.7rem; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--paper); font-size: 0.8rem; font-weight: 550; color: var(--ink);
-  cursor: pointer; user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font-size: 0.8rem;
+  font-weight: 550;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
 }
 .chip input { position:absolute; opacity:0; pointer-events:none; width:0; height:0; }
 .chip.is-on, .chip:has(input:checked) {
@@ -460,21 +539,63 @@
   border: 0; background: transparent; color: var(--accent-ink);
   font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 0.25rem;
 }
-.chip-add { display:flex; gap:0.4rem; margin-top:0.55rem; max-width:28rem; }
-.chip-add .field { flex:1; }
-.range-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr)); gap:0.85rem; margin-top:0.5rem; }
-.range-block { margin-top:0.5rem; }
+.chip-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  width: 100%;
+  max-width: 28rem;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.chip-add .field { flex: 1 1 10rem; min-width: 0; max-width: 100%; }
+.chip-add .btn { flex: 0 0 auto; }
+.range-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+  min-width: 0;
+  width: 100%;
+}
+.range-block { margin-top: 0.5rem; min-width: 0; max-width: 100%; }
 .range-caption { font-size:0.7rem; font-weight:650; color:var(--ink-muted); margin-bottom:0.2rem; }
 .range-readout { font-size:0.9rem; font-weight:700; color:var(--ink); margin-bottom:0.35rem; }
 .range-inputs {
-  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.65rem;
   margin-bottom: 0.45rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 .range-inputs label {
-  display: flex; flex-direction: column; gap: 0.2rem;
-  font-size: 0.7rem; font-weight: 650; color: var(--ink-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--ink-muted);
+  min-width: 0;
 }
-.range-inputs .range-num { width: 5.5rem; padding: 0.4rem 0.5rem; }
+.range-inputs .range-num {
+  width: 5.5rem;
+  max-width: 100%;
+  padding: 0.4rem 0.5rem;
+  box-sizing: border-box;
+}
+.range-grow {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+.range-grow .field {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .range-sep { font-size: 0.8rem; color: var(--ink-muted); padding-bottom: 0.45rem; }
 .range-unit { font-size: 0.8rem; font-weight: 650; color: var(--ink); padding-bottom: 0.45rem; }
 .dual-range {
@@ -483,6 +604,10 @@
   display: flex;
   align-items: center;
   margin: 0.15rem 0 0.1rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .dual-range-track {
   position: absolute;
@@ -501,7 +626,10 @@
 }
 .dual-range input[type="range"] {
   position: absolute;
-  left: 0; right: 0; width: 100%;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: 100%;
   height: 1.75rem;
   margin: 0;
   background: transparent;
@@ -509,6 +637,7 @@
   -webkit-appearance: none;
   appearance: none;
   z-index: 2;
+  box-sizing: border-box;
 }
 .dual-range input[type="range"][data-range="max"] { z-index: 3; }
 .dual-range input[type="range"]::-webkit-slider-runnable-track {
@@ -565,12 +694,55 @@
   .rfp-form { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
-  .lot-toolbar-meta { width:100%; justify-content:space-between; }
-  .lot-toolbar-meta > div { text-align:left !important; }
-  .chip-add { flex-direction:column; }
+  .lot-toolbar { flex-direction: column; align-items: stretch; }
+  .lot-toolbar-meta { width: 100%; justify-content: space-between; }
+  .lot-toolbar-meta > div { text-align: left !important; }
+  .chip-add { max-width: 100%; }
+  .chip-add .btn { width: 100%; }
   .rfp-section { padding: 0.75rem; }
-  .lot-rfp-chrome, .lot-rfp-scroll, .lot-rfp-footer { padding-left: 0.85rem; padding-right: 0.85rem; }
-  .lot-rfp-footer .btn { flex: 1 1 auto; }
+  .lot-rfp-chrome,
+  .lot-rfp-scroll,
+  .lot-rfp-footer {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .lot-rfp-footer .btn-row-mobile {
+    width: 100%;
+  }
+  .lot-rfp-footer .btn { flex: 1 1 auto; min-width: 0; }
+  .range-grid { grid-template-columns: minmax(0, 1fr); }
+  .range-inputs-stack {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .range-inputs-stack .range-sep {
+    display: none;
+  }
+  .range-inputs-stack .range-grow {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .range-inputs .range-num {
+    width: 100%;
+    max-width: 8rem;
+  }
+  .dual-range {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+@media (max-width: 420px) {
+  .chip {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.75rem;
+  }
+  .range-inputs .range-num { max-width: none; width: 100%; }
+  .range-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .range-sep { display: none; }
+  .range-unit { padding-bottom: 0; }
 }
 </style>
 
