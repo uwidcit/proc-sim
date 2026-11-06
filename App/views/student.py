@@ -440,11 +440,7 @@ def student_lots_page():
             rfp_form[field] = getattr(existing_rfp, field, '') or ''
     rfp_ui = parse_rfp_ui(rfp_form)
 
-    page_title = (
-        f"RFP for Lot {current_lot.id}"
-        if existing_rfp and existing_rfp.status == "submitted"
-        else f"Create RFP for Lot {current_lot.id}"
-    )
+    page_title = "RFP"
     return render_template(
         'student/client_lots.html',
         active_page='lots',

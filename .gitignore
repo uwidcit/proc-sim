@@ -169,3 +169,4 @@ easypanel-ssh.txt
 
 # Local deploy / prod helper scripts
 scripts/
+.fake

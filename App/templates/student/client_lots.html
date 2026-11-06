@@ -18,23 +18,32 @@
       {% endfor %}
     </div>
 
-    <div class="toolbar lot-toolbar">
-      <div style="min-width:0; flex:1 1 12rem;">
-        <h2 class="font-heading" style="margin:0; font-size:1.15rem; font-weight:700;">
-          {% if is_locked %}RFP for {{ current_lot.name or ('Lot ' ~ current_lot.id) }}{% else %}Create RFP for {{ current_lot.name or ('Lot ' ~ current_lot.id) }}{% endif %}
-        </h2>
-        <div class="lot-toolbar-sub">
-          {{ current_lot.labType }} · {{ current_lot.labSize }} · {{ current_lot.numMachines }} machines
-          {% if current_lot.labTypeObj %} · {{ current_lot.labTypeObj.description }}{% endif %}
+    <div class="lot-meta-bar">
+      <details class="lot-info-pop">
+        <summary class="lot-info-btn" aria-label="Lot details">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none">
+            <circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 7.25v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="8" cy="5.15" r="0.85" fill="currentColor"/>
+          </svg>
+        </summary>
+        <div class="lot-info-panel">
+          <div class="lot-info-title">{{ current_lot.name or ('Lot ' ~ current_lot.id) }}</div>
+          <div class="lot-info-facts">
+            {{ current_lot.labType }} · {{ current_lot.labSize }} · {{ current_lot.numMachines }} machines
+          </div>
+          {% if current_lot.labTypeObj and current_lot.labTypeObj.description %}
+          <p class="lot-info-desc">{{ current_lot.labTypeObj.description }}</p>
+          {% endif %}
+          {% if not is_locked %}
+          <p class="lot-info-tip">Specify the appropriate features and resources to match your lab scenario.</p>
+          {% endif %}
         </div>
-        {% if not is_locked %}
-        <p class="rfp-title-tip">Specify the appropriate features and resources to match your lab scenario.</p>
-        {% endif %}
-      </div>
+      </details>
       <div class="lot-toolbar-meta">
-        <div style="text-align:right;">
-          <div style="font-size:0.7rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--ink-muted);">Budget ({{ currency_code }})</div>
-          <div style="font-weight:700;">{{ current_lot.budget|money }}</div>
+        <div class="lot-budget">
+          <span class="lot-budget-label">Budget ({{ currency_code }})</span>
+          <span class="lot-budget-value">{{ current_lot.budget|money }}</span>
         </div>
         {% if existing_rfp %}
         <span class="badge {% if existing_rfp.status == 'submitted' %}badge-ok{% else %}badge-pending{% endif %}">{{ existing_rfp.status }}</span>
@@ -350,7 +359,7 @@
   </div>
 
   <footer class="lot-rfp-footer">
-    <div class="btn-row-mobile" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+    <div class="lot-rfp-actions">
       <button type="submit" name="action" value="save" class="btn btn-secondary" formnovalidate>Save draft</button>
       <button type="submit" name="action" value="submit" class="btn btn-primary">Submit final RFP</button>
     </div>
@@ -389,48 +398,105 @@
 }
 .lot-rfp-chrome {
   flex-shrink: 0;
-  padding: 0.85rem 1.1rem 0.65rem;
+  padding: 0.55rem 1.1rem 0.5rem;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   min-width: 0;
 }
-.lot-rfp-chrome .tabs { margin-bottom: 0.65rem; max-width: 100%; }
-.lot-toolbar {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
+.lot-rfp-chrome .tabs { margin-bottom: 0.45rem; max-width: 100%; }
+.lot-meta-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 0.65rem 1rem;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
   min-width: 0;
   width: 100%;
 }
-.lot-toolbar > div:first-child { min-width: 0; flex: 1 1 12rem; max-width: 100%; }
-.lot-toolbar-sub {
+.lot-info-pop {
+  position: relative;
+  flex: 0 0 auto;
+}
+.lot-info-btn {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.lot-info-btn::-webkit-details-marker { display: none; }
+.lot-info-btn::marker { content: ""; }
+.lot-info-pop[open] .lot-info-btn,
+.lot-info-btn:hover {
+  color: var(--accent-ink, var(--brand-700, #0f766e));
+  border-color: #99f6e4;
+  background: var(--accent-soft, #f0fdfa);
+}
+.lot-info-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 40;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(20, 33, 43, 0.12);
+}
+.lot-info-title {
+  font-family: var(--font-heading, Sora, sans-serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.lot-info-facts {
+  margin-top: 0.3rem;
   font-size: 0.8rem;
   color: var(--ink-muted);
-  margin-top: 0.25rem;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  line-height: 1.4;
 }
+.lot-info-desc,
+.lot-info-tip {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink);
+  line-height: 1.45;
+}
+.lot-info-tip { color: var(--ink-muted); }
 .lot-toolbar-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
-  flex: 0 1 auto;
+  margin-left: auto;
   min-width: 0;
 }
-.rfp-title-tip {
-  margin: 0.45rem 0 0;
-  font-size: 0.8rem;
+.lot-budget {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.lot-budget-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--ink-muted);
-  line-height: 1.4;
-  max-width: 40rem;
-  overflow-wrap: anywhere;
+}
+.lot-budget-value {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
 }
 .lot-rfp-form-shell {
   flex: 1;
@@ -456,7 +522,6 @@
 .lot-rfp-footer {
   flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1.1rem;
@@ -464,6 +529,20 @@
   border-top: 1px solid var(--line);
   box-shadow: 0 -6px 16px rgba(20, 33, 43, 0.04);
   min-width: 0;
+}
+.lot-rfp-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+.lot-rfp-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
 }
 .field-hint {
   display: block;
@@ -694,9 +773,9 @@
   .rfp-form { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
-  .lot-toolbar { flex-direction: column; align-items: stretch; }
-  .lot-toolbar-meta { width: 100%; justify-content: space-between; }
-  .lot-toolbar-meta > div { text-align: left !important; }
+  .lot-toolbar-meta { margin-left: 0; flex: 1 1 auto; justify-content: space-between; }
+  .lot-budget { align-items: flex-start; }
+  .lot-info-panel { left: 0; right: auto; width: min(20rem, calc(100vw - 1.5rem)); }
   .chip-add { max-width: 100%; }
   .chip-add .btn { width: 100%; }
   .rfp-section { padding: 0.75rem; }
@@ -706,10 +785,8 @@
     padding-left: 0.75rem;
     padding-right: 0.75rem;
   }
-  .lot-rfp-footer .btn-row-mobile {
-    width: 100%;
-  }
-  .lot-rfp-footer .btn { flex: 1 1 auto; min-width: 0; }
+  .lot-rfp-actions { width: 100%; }
+  .lot-rfp-actions .btn { flex: 1 1 0; width: auto; }
   .range-grid { grid-template-columns: minmax(0, 1fr); }
   .range-inputs-stack {
     flex-direction: column;
@@ -1050,4 +1127,16 @@
 })();
 </script>
 {% endif %}
+<script>
+(function () {
+  const pop = document.querySelector(".lot-info-pop");
+  if (!pop) return;
+  document.addEventListener("click", (e) => {
+    if (pop.open && !pop.contains(e.target)) pop.open = false;
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && pop.open) pop.open = false;
+  });
+})();
+</script>
 {% endblock %}
