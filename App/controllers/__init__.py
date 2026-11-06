@@ -14,3 +14,4 @@ from .evaluation import *
 from .settings import *
 from .csv_import import *
 from .academic_year import *
+from .admin_sandbox import *

@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required, current_user
 from App.models import *
 from App.controllers import *
 from App.utils import (
+    acting_student,
     format_timestamp,
     get_current_student_group,
     get_lot_owner_group_id,
@@ -18,8 +19,12 @@ def student_required(f):
     @wraps(f)
     @jwt_required()
     def decorated_function(*args, **kwargs):
-        if not current_user.is_student():
-            flash("You are logged in as an admin and therefore cannot access student page", "failed")
+        # Admins may use student flows via the AdminLab sandbox persona
+        if not (current_user.is_student() or current_user.is_admin()):
+            flash("You must be logged in as a student or admin", "failed")
+            return redirect(url_for('index_views.index_page'))
+        if acting_student() is None:
+            flash("Student workspace is unavailable", "failed")
             return redirect(url_for('index_views.index_page'))
         return f(*args, **kwargs)
     return decorated_function
@@ -28,7 +33,8 @@ def student_required(f):
 def group_status_check(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        exists = check_studentGroup(current_user.id)
+        me = acting_student()
+        exists = check_studentGroup(me.id)
 
         if not exists:
             flash("You either have not created a group yet or your group has been reject or removed, create a new one", "info")
@@ -50,7 +56,7 @@ student_views = Blueprint('student_views', __name__, template_folder='../templat
 @student_views.route('/student', methods=['GET'])
 @student_required
 def student_home_page():
-    exists = check_studentGroup(current_user.id)
+    exists = check_studentGroup(acting_student().id)
     if not exists:
         return redirect(url_for('student_views.student_create_group_page'))
     return redirect(url_for('student_views.student_group_details_page'))
@@ -58,7 +64,7 @@ def student_home_page():
 
 def _year_mismatch_message(year):
     return (
-        f"Your account is for {getattr(current_user, 'academic_year', '?')}. "
+        f"Your account is for {acting_student().academic_year}. "
         f"Only students for {year} can form groups while that year is active."
     )
 
@@ -67,7 +73,7 @@ def _duplicate_member_message(duplicates):
     students = []
     you = False
     for ID in duplicates:
-        if ID == current_user.id:
+        if ID == acting_student().id:
             you = True
             continue
         student = get_student(ID)
@@ -100,12 +106,17 @@ def _group_form_candidates(year, selected_ids=None, exclude_group_id=None):
         ).all()
         taken_ids -= set(own_members)
 
+    from App.controllers.admin_sandbox import admin_sandbox_username
+
+    sandbox_username = admin_sandbox_username(year)
     students = db.session.scalars(
         db.select(Student).filter_by(academic_year=year).order_by(Student.name)
     ).all()
     candidates = []
     for student in students:
-        if student.id == current_user.id:
+        if student.id == acting_student().id:
+            continue
+        if student.username == sandbox_username:
             continue
         if not student.account_claimed and student.id not in selected_ids:
             continue
@@ -123,7 +134,7 @@ def _group_form_candidates(year, selected_ids=None, exclude_group_id=None):
 @student_views.route('/student/create-group', methods=['GET', 'POST'])
 @student_required
 def student_create_group_page():
-    exists = check_studentGroup(current_user.id)
+    exists = check_studentGroup(acting_student().id)
 
     if exists:
         group = get_group(exists.groupID)
@@ -138,10 +149,10 @@ def student_create_group_page():
         name = request.form.get('group_name')
         members = request.form.getlist('members')
 
-        members.append(str(current_user.id))
+        members.append(str(acting_student().id))
 
         year = get_current_year()
-        if getattr(current_user, "academic_year", None) != year:
+        if acting_student().academic_year != year:
             flash(_year_mismatch_message(year), "failed")
             return redirect(url_for('student_views.student_create_group_page'))
 
@@ -188,7 +199,7 @@ def student_create_group_page():
         return redirect(url_for('student_views.student_group_details_page'))
 
     year = get_current_year()
-    if getattr(current_user, "academic_year", None) != year:
+    if acting_student().academic_year != year:
         flash(_year_mismatch_message(year), "failed")
         return render_template(
             'student/create_group.html',
@@ -226,7 +237,7 @@ def student_create_group_page():
 @student_views.route('/student/edit-group', methods=['GET', 'POST'])
 @student_required
 def student_edit_group_page():
-    exists = check_studentGroup(current_user.id)
+    exists = check_studentGroup(acting_student().id)
     if not exists:
         flash("You do not have a group request to edit", "info")
         return redirect(url_for('student_views.student_create_group_page'))
@@ -242,9 +253,9 @@ def student_edit_group_page():
     if request.method == 'POST':
         name = request.form.get('group_name')
         members = request.form.getlist('members')
-        members.append(str(current_user.id))
+        members.append(str(acting_student().id))
 
-        if getattr(current_user, "academic_year", None) != year:
+        if acting_student().academic_year != year:
             flash(_year_mismatch_message(year), "failed")
             return redirect(url_for('student_views.student_edit_group_page'))
 
@@ -290,7 +301,7 @@ def student_edit_group_page():
     current_member_ids = db.session.scalars(
         db.select(StudentGroup.studentID).filter_by(groupID=group.id)
     ).all()
-    selected_others = [sid for sid in current_member_ids if sid != current_user.id]
+    selected_others = [sid for sid in current_member_ids if sid != acting_student().id]
     candidates = _group_form_candidates(
         year,
         selected_ids=selected_others,
@@ -316,7 +327,7 @@ def student_edit_group_page():
 @student_views.route('/student/group-details', methods=['GET'])
 @student_required
 def student_group_details_page():
-    exists = check_studentGroup(current_user.id)
+    exists = check_studentGroup(acting_student().id)
 
     if not exists:
         flash("You either have not created a group yet or your group has been reject or removed, create a new one", "info")
@@ -349,7 +360,7 @@ def student_group_details_page():
 @student_required
 @group_status_check
 def student_lots_page():
-    yourGroup = get_current_student_group(current_user.id)
+    yourGroup = get_current_student_group(acting_student().id)
 
     if request.method == 'POST':
         action = request.form.get('action')
@@ -461,7 +472,7 @@ def student_lots_page():
 def student_view_bids_page():
     ASSIGNED_LOTS = []
 
-    yourGroup = get_current_student_group(current_user.id)
+    yourGroup = get_current_student_group(acting_student().id)
 
     yourLots = db.session.scalars(
         db.select(Lot)
@@ -534,7 +545,7 @@ def student_bid_details_page(bid_id):
 
     technical_specs = list(RFP_SPEC_CATEGORIES)
 
-    yourGroup = get_current_student_group(current_user.id)
+    yourGroup = get_current_student_group(acting_student().id)
     bidObj = get_bid(bid_id)
 
     if not bidObj or bidObj.recipientGroupID != yourGroup.id:
@@ -653,7 +664,7 @@ def student_bid_details_page(bid_id):
 @student_required
 @group_status_check
 def student_client_evaluation_page():
-    yourGroup = get_current_student_group(current_user.id)
+    yourGroup = get_current_student_group(acting_student().id)
 
     yourLots = db.session.scalars(
         db.select(Lot)
@@ -734,7 +745,7 @@ def student_client_evaluation_page():
 @student_required
 @group_status_check
 def rfp_gallery_page():
-    yourGroup = get_current_student_group(current_user.id)
+    yourGroup = get_current_student_group(acting_student().id)
 
     if request.method == "POST":
         pdf = request.files.get('pdf')
@@ -850,7 +861,7 @@ def submitted_bids_page():
     rejected = 0
     results_published = are_results_published()
 
-    yourGroup = get_current_student_group(current_user.id)
+    yourGroup = get_current_student_group(acting_student().id)
 
     yourBids = db.session.scalars(
         db.select(Bid).filter_by(sourceGroupID=yourGroup.id)
@@ -903,7 +914,7 @@ def submitted_bids_page():
 @student_views.route('/student/bid-document/<int:bid_id>')
 @student_required
 def serve_bid_document(bid_id):
-    yourGroup = get_current_student_group(current_user.id)
+    yourGroup = get_current_student_group(acting_student().id)
     bid = get_bid(bid_id)
     if not bid:
         return "Not found", 404

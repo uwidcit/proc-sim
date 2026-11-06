@@ -24,17 +24,33 @@
       />
     </div>
 
+    <div class="toolbar rfp-bulk-bar" id="rfpBulkBar" hidden>
+      <label class="rfp-select-all" style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; font-weight:650; color:var(--ink); cursor:pointer;">
+        <input type="checkbox" id="rfpSelectAllVisible" />
+        Select visible
+      </label>
+      <span style="font-size:0.8rem; color:var(--ink-muted);">
+        <strong style="color:var(--ink);" id="rfpSelectedCount">0</strong> selected
+      </span>
+      <span style="flex:1"></span>
+      <button type="button" class="btn btn-primary" id="bulkPublishBtn" disabled>Publish</button>
+      <button type="button" class="btn btn-secondary" id="bulkDraftBtn" disabled>Set draft</button>
+      <button type="button" class="btn btn-ghost" id="bulkClearBtn" disabled>Clear</button>
+    </div>
+
     {% if all_rfps %}
     <div class="panel-grid" id="rfpGrid">
       {% for rfp in all_rfps %}
-      <button
-        type="button"
+      <div
         class="panel-card rfp-card"
+        role="button"
+        tabindex="0"
         data-status="{{ rfp.status }}"
         data-name="{{ rfp.name|e }}"
         data-lot="{{ rfp.Lot|e }}"
         data-lot-id="{{ rfp.lotID }}"
         data-group-id="{{ rfp.groupID }}"
+        data-key="{{ rfp.groupID }}:{{ rfp.lotID }}"
         data-timestamp="{{ rfp.timestamp|e }}"
         data-devicetype="{{ rfp.deviceType|e }}"
         data-resolution="{{ rfp.resolution|e }}"
@@ -47,7 +63,10 @@
         data-peripherals="{{ rfp.peripherals|e }}"
         data-features="{{ rfp.features|e }}"
       >
-        <span style="display:flex; align-items:start; justify-content:space-between; gap:0.5rem;">
+        <label class="rfp-card-check" title="Select RFP" onclick="event.stopPropagation()">
+          <input type="checkbox" class="rfp-check" value="{{ rfp.groupID }}:{{ rfp.lotID }}" />
+        </label>
+        <span style="display:flex; align-items:start; justify-content:space-between; gap:0.5rem; padding-left:1.5rem;">
           <span class="panel-card-title">{{ rfp.name }}</span>
           {% if rfp.status == 'draft' %}
           <span class="badge badge-pending">Draft</span>
@@ -55,9 +74,9 @@
           <span class="badge badge-ok">Published</span>
           {% endif %}
         </span>
-        <span class="panel-card-meta">{{ rfp.lot_label or ('Lot ' ~ rfp.lotID) }} · {{ rfp.Lot }}</span>
-        <span class="panel-card-meta" style="flex:0;">{{ rfp.timestamp }}</span>
-      </button>
+        <span class="panel-card-meta" style="padding-left:1.5rem;">{{ rfp.lot_label or ('Lot ' ~ rfp.lotID) }} · {{ rfp.Lot }}</span>
+        <span class="panel-card-meta" style="flex:0; padding-left:1.5rem;">{{ rfp.timestamp }}</span>
+      </div>
       {% endfor %}
     </div>
     <div id="rfpEmptyFilter" class="surface" style="display:none; padding:1.25rem; color:var(--ink-muted); font-size:0.875rem;">
@@ -100,6 +119,8 @@
     </div>
     <div class="detail-sidenav-footer" id="previewFooter" style="display:none;">
       <button type="button" class="btn btn-danger" id="removeRfpBtn" style="margin-right:auto;">Remove</button>
+      <button type="button" class="btn btn-secondary" id="previewDraftBtn">Set draft</button>
+      <button type="button" class="btn btn-primary" id="previewPublishBtn">Publish</button>
     </div>
   </aside>
 </div>
@@ -110,10 +131,38 @@
     <p id="confirmRfpMessage" style="margin:0 0 1rem; font-size:0.875rem; color:var(--ink-muted);"></p>
     <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
       <button type="button" class="btn btn-secondary" id="cancelRfpConfirm">Cancel</button>
-      <button type="button" class="btn btn-danger" id="confirmRfpActionBtn">Remove</button>
+      <button type="button" class="btn" id="confirmRfpActionBtn">Confirm</button>
     </div>
   </div>
 </div>
+
+<style>
+.rfp-bulk-bar[hidden] { display: none !important; }
+.rfp-card { position: relative; }
+.rfp-card.is-checked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.35);
+}
+.rfp-card-check {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  cursor: pointer;
+}
+.rfp-card-check input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+</style>
 
 <script>
 (function () {
@@ -127,9 +176,19 @@
   const previewFooter = document.getElementById('previewFooter');
   const clearPreviewBtn = document.getElementById('clearPreviewBtn');
   const removeBtn = document.getElementById('removeRfpBtn');
+  const previewDraftBtn = document.getElementById('previewDraftBtn');
+  const previewPublishBtn = document.getElementById('previewPublishBtn');
+  const bulkBar = document.getElementById('rfpBulkBar');
+  const selectAllVisible = document.getElementById('rfpSelectAllVisible');
+  const selectedCountEl = document.getElementById('rfpSelectedCount');
+  const bulkPublishBtn = document.getElementById('bulkPublishBtn');
+  const bulkDraftBtn = document.getElementById('bulkDraftBtn');
+  const bulkClearBtn = document.getElementById('bulkClearBtn');
+  const confirmActionBtn = document.getElementById('confirmRfpActionBtn');
   let activeFilter = 'all';
   let selectedCard = null;
   let pendingForm = null;
+  let confirmTone = 'danger';
 
   function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -138,6 +197,45 @@
   function setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value || '—';
+  }
+
+  function checkedKeys() {
+    return cards
+      .map(function (card) { return card.querySelector('.rfp-check'); })
+      .filter(function (cb) { return cb && cb.checked; })
+      .map(function (cb) { return cb.value; });
+  }
+
+  function visibleCards() {
+    return cards.filter(function (card) { return card.style.display !== 'none'; });
+  }
+
+  function syncBulkBar() {
+    const keys = checkedKeys();
+    const n = keys.length;
+    if (bulkBar) bulkBar.hidden = cards.length === 0;
+    if (selectedCountEl) selectedCountEl.textContent = String(n);
+    const enabled = n > 0;
+    if (bulkPublishBtn) bulkPublishBtn.disabled = !enabled;
+    if (bulkDraftBtn) bulkDraftBtn.disabled = !enabled;
+    if (bulkClearBtn) bulkClearBtn.disabled = !enabled;
+    cards.forEach(function (card) {
+      const cb = card.querySelector('.rfp-check');
+      card.classList.toggle('is-checked', !!(cb && cb.checked));
+    });
+    if (selectAllVisible) {
+      const visible = visibleCards();
+      const allOn = visible.length > 0 && visible.every(function (card) {
+        const cb = card.querySelector('.rfp-check');
+        return cb && cb.checked;
+      });
+      const someOn = visible.some(function (card) {
+        const cb = card.querySelector('.rfp-check');
+        return cb && cb.checked;
+      });
+      selectAllVisible.checked = allOn;
+      selectAllVisible.indeterminate = someOn && !allOn;
+    }
   }
 
   function clearPreview() {
@@ -179,6 +277,14 @@
     setText('preview-features', card.dataset.features);
 
     removeBtn.textContent = isDraft ? 'Remove draft' : 'Remove';
+    if (previewDraftBtn) {
+      previewDraftBtn.disabled = isDraft;
+      previewDraftBtn.style.display = isDraft ? 'none' : '';
+    }
+    if (previewPublishBtn) {
+      previewPublishBtn.disabled = !isDraft;
+      previewPublishBtn.style.display = isDraft ? '' : 'none';
+    }
   }
 
   function applyFilters() {
@@ -200,6 +306,7 @@
     });
     if (visibleCount) visibleCount.textContent = String(shown);
     if (emptyFilter) emptyFilter.style.display = cards.length && shown === 0 ? '' : 'none';
+    syncBulkBar();
   }
 
   filterBtns.forEach(function (btn) {
@@ -213,19 +320,50 @@
   searchInput?.addEventListener('input', applyFilters);
 
   cards.forEach(function (card) {
-    card.addEventListener('click', function () {
+    card.addEventListener('click', function (e) {
+      if (e.target.closest('.rfp-card-check')) return;
       showPreview(card);
     });
+    card.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        showPreview(card);
+      }
+    });
+    const cb = card.querySelector('.rfp-check');
+    cb?.addEventListener('change', syncBulkBar);
+    cb?.addEventListener('click', function (e) { e.stopPropagation(); });
   });
 
   clearPreviewBtn?.addEventListener('click', clearPreview);
 
-  function showConfirm(title, message, form) {
+  selectAllVisible?.addEventListener('change', function () {
+    const on = selectAllVisible.checked;
+    visibleCards().forEach(function (card) {
+      const cb = card.querySelector('.rfp-check');
+      if (cb) cb.checked = on;
+    });
+    syncBulkBar();
+  });
+
+  bulkClearBtn?.addEventListener('click', function () {
+    cards.forEach(function (card) {
+      const cb = card.querySelector('.rfp-check');
+      if (cb) cb.checked = false;
+    });
+    syncBulkBar();
+  });
+
+  function showConfirm(title, message, form, tone) {
     pendingForm = form;
+    confirmTone = tone || 'danger';
     document.getElementById('confirmRfpTitle').textContent = title;
     document.getElementById('confirmRfpMessage').textContent = message;
-    const modal = document.getElementById('confirmRfpModal');
-    modal.style.display = 'flex';
+    confirmActionBtn.textContent = tone === 'primary' ? 'Publish' : (tone === 'secondary' ? 'Set draft' : 'Remove');
+    confirmActionBtn.className = 'btn ' + (
+      tone === 'primary' ? 'btn-primary' : (tone === 'secondary' ? 'btn-secondary' : 'btn-danger')
+    );
+    document.getElementById('confirmRfpModal').style.display = 'flex';
   }
 
   function hideConfirm() {
@@ -233,8 +371,53 @@
     document.getElementById('confirmRfpModal').style.display = 'none';
   }
 
+  function buildStatusForm(keys, status) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{{ url_for('admin_views.admin_manage_rfps') }}";
+    let html =
+      '<input type="hidden" name="action" value="set_status">' +
+      '<input type="hidden" name="status" value="' + status + '">' +
+      '<input type="hidden" name="csrf_token" value="' + csrfToken() + '">';
+    keys.forEach(function (key) {
+      html += '<input type="hidden" name="rfp_key" value="' + key + '">';
+    });
+    form.innerHTML = html;
+    return form;
+  }
+
+  function confirmStatusChange(keys, status) {
+    if (!keys.length) return;
+    const n = keys.length;
+    const publishing = status === 'submitted';
+    showConfirm(
+      publishing ? 'Publish RFPs?' : 'Set RFPs to draft?',
+      publishing
+        ? ('Publish ' + n + ' RFP' + (n === 1 ? '' : 's') + ' to the vendor gallery.')
+        : ('Move ' + n + ' RFP' + (n === 1 ? '' : 's') + ' back to draft (hidden from gallery).'),
+      buildStatusForm(keys, status),
+      publishing ? 'primary' : 'secondary'
+    );
+  }
+
+  bulkPublishBtn?.addEventListener('click', function () {
+    confirmStatusChange(checkedKeys(), 'submitted');
+  });
+  bulkDraftBtn?.addEventListener('click', function () {
+    confirmStatusChange(checkedKeys(), 'draft');
+  });
+
+  previewPublishBtn?.addEventListener('click', function () {
+    if (!selectedCard) return;
+    confirmStatusChange([selectedCard.dataset.key], 'submitted');
+  });
+  previewDraftBtn?.addEventListener('click', function () {
+    if (!selectedCard) return;
+    confirmStatusChange([selectedCard.dataset.key], 'draft');
+  });
+
   document.getElementById('cancelRfpConfirm').addEventListener('click', hideConfirm);
-  document.getElementById('confirmRfpActionBtn').addEventListener('click', function () {
+  confirmActionBtn.addEventListener('click', function () {
     if (pendingForm) {
       document.body.appendChild(pendingForm);
       pendingForm.submit();
@@ -257,9 +440,12 @@
       isDraft
         ? 'This permanently removes the draft RFP.'
         : 'This permanently removes the published RFP from the gallery.',
-      form
+      form,
+      'danger'
     );
   });
+
+  syncBulkBar();
 })();
 </script>
 {% endblock %}

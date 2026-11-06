@@ -675,3 +675,9 @@ def initialize():
             _seed_2025_rfps_and_bids(groups_2025)
         else:
             _seed_test_groups(open_year)
+
+    # Admin testing persona: claimed student in pre-approved AdminLab (each year)
+    from App.controllers.admin_sandbox import ensure_admin_sandbox
+
+    for year in (archive_year, *SEED_OPEN_YEARS):
+        ensure_admin_sandbox(year)

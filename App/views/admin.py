@@ -573,6 +573,32 @@ def admin_manage_rfps():
         if action in ("reject", "remove"):
             remove_rfp(groupID, lotID)
             flash(f'RFP for Lot {lotID} removed successfully', "success")
+        elif action == "set_status":
+            status = (request.form.get("status") or "").strip()
+            # Accept UI label "published" as submitted
+            if status == "published":
+                status = "submitted"
+            raw_keys = request.form.getlist("rfp_key")
+            keys = []
+            for raw in raw_keys:
+                parts = (raw or "").split(":", 1)
+                if len(parts) != 2:
+                    continue
+                try:
+                    keys.append((int(parts[0]), int(parts[1])))
+                except (TypeError, ValueError):
+                    continue
+            if not keys:
+                flash("Select at least one RFP", "failed")
+            else:
+                count, err = set_rfps_status(keys, status)
+                if err:
+                    flash(err, "failed")
+                elif count:
+                    label = "draft" if status == "draft" else "published"
+                    flash(f"Updated {count} RFP{'s' if count != 1 else ''} to {label}", "success")
+                else:
+                    flash("No matching RFPs found", "info")
 
         return redirect(url_for('admin_views.admin_manage_rfps'))
 

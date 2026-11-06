@@ -92,6 +92,26 @@ def approve_rfp(groupID, lotID):
     return rfp
 
 
+def set_rfps_status(keys, status):
+    """Admin helper: set status on many RFPs. keys are (groupID, lotID).
+
+    status must be 'draft' or 'submitted' (UI label: Published).
+    """
+    if status not in ("draft", "submitted"):
+        return 0, "Invalid status"
+    updated = 0
+    for groupID, lotID in keys:
+        rfp = get_rfp(groupID, lotID)
+        if not rfp:
+            continue
+        if rfp.status != status:
+            rfp.status = status
+        updated += 1
+    if updated:
+        db.session.commit()
+    return updated, None
+
+
 def get_rfp(groupID, lotID):
     return db.session.get(RFP, (int(groupID), int(lotID)))
 

@@ -222,23 +222,33 @@
   </fieldset>
 
   {# ── Graphics ── #}
-  <fieldset class="rfp-section rfp-span-all">
+  <fieldset class="rfp-section rfp-span-all" data-gpu-section>
     <legend>Graphics</legend>
-    <div class="range-grid" style="margin-top:0.15rem;">
-      <div class="range-block" data-range-pair data-decimals="0" data-unit=" GB" data-sync-numbers>
+    <div class="chip-row" style="margin:0.15rem 0 0.85rem;" role="radiogroup" aria-label="Graphics type">
+      <label class="chip {% if rfp_ui.gpu_type != 'integrated' %}is-on{% endif %}">
+        <input type="radio" name="gpu_type" value="dedicated" {% if rfp_ui.gpu_type != 'integrated' %}checked{% endif %} data-gpu-type />
+        Dedicated (VRAM)
+      </label>
+      <label class="chip {% if rfp_ui.gpu_type == 'integrated' %}is-on{% endif %}">
+        <input type="radio" name="gpu_type" value="integrated" {% if rfp_ui.gpu_type == 'integrated' %}checked{% endif %} data-gpu-type />
+        Integrated
+      </label>
+    </div>
+    <div class="range-grid">
+      <div class="range-block" data-vram-block data-range-pair data-decimals="0" data-unit=" GB" data-sync-numbers {% if rfp_ui.gpu_type == 'integrated' %}hidden{% endif %}>
         <div class="range-caption">Required VRAM range (GB)</div>
         <div class="range-inputs">
-          <label>Min <input class="field range-num" type="number" min="1" max="48" step="1" value="{{ rfp_ui.vram_min }}" data-num="min" required /></label>
+          <label>Min <input class="field range-num" type="number" min="1" max="48" step="1" value="{{ rfp_ui.vram_min }}" data-num="min" data-vram-required {% if rfp_ui.gpu_type != 'integrated' %}required{% endif %} /></label>
           <span class="range-sep">to</span>
-          <label>Max <input class="field range-num" type="number" min="1" max="48" step="1" value="{{ rfp_ui.vram_max }}" data-num="max" required /></label>
+          <label>Max <input class="field range-num" type="number" min="1" max="48" step="1" value="{{ rfp_ui.vram_max }}" data-num="max" data-vram-required {% if rfp_ui.gpu_type != 'integrated' %}required{% endif %} /></label>
           <span class="range-unit">GB</span>
         </div>
         <div class="dual-range">
           <div class="dual-range-track" aria-hidden="true"><span class="dual-range-fill"></span></div>
-          <input type="range" name="vram_min" min="1" max="48" step="1" value="{{ rfp_ui.vram_min }}" data-range="min" />
-          <input type="range" name="vram_max" min="1" max="48" step="1" value="{{ rfp_ui.vram_max }}" data-range="max" />
+          <input type="range" name="vram_min" min="1" max="48" step="1" value="{{ rfp_ui.vram_min }}" data-range="min" {% if rfp_ui.gpu_type == 'integrated' %}disabled{% endif %} />
+          <input type="range" name="vram_max" min="1" max="48" step="1" value="{{ rfp_ui.vram_max }}" data-range="max" {% if rfp_ui.gpu_type == 'integrated' %}disabled{% endif %} />
         </div>
-        <span class="field-hint">Required graphics memory range — no brand or model</span>
+        <span class="field-hint">Required dedicated graphics memory — no brand or model</span>
       </div>
 
       <div class="range-block">
@@ -689,6 +699,33 @@
     }
     minSel.addEventListener("change", () => syncGpuRes(true));
     maxSel.addEventListener("change", () => syncGpuRes(false));
+  }
+
+  // Integrated graphics: hide VRAM range and clear required
+  const gpuSection = document.querySelector("[data-gpu-section]");
+  if (gpuSection) {
+    const vramBlock = gpuSection.querySelector("[data-vram-block]");
+    const typeInputs = gpuSection.querySelectorAll("[data-gpu-type]");
+    function syncGpuType() {
+      const selected = gpuSection.querySelector('[name="gpu_type"]:checked');
+      const integrated = selected && selected.value === "integrated";
+      if (vramBlock) {
+        vramBlock.hidden = integrated;
+        vramBlock.querySelectorAll("[data-vram-required]").forEach((el) => {
+          if (integrated) el.removeAttribute("required");
+          else el.setAttribute("required", "required");
+        });
+        vramBlock.querySelectorAll('input[type="range"]').forEach((el) => {
+          el.disabled = integrated;
+        });
+      }
+      typeInputs.forEach((input) => {
+        const chip = input.closest(".chip");
+        if (chip) chip.classList.toggle("is-on", input.checked);
+      });
+    }
+    typeInputs.forEach((input) => input.addEventListener("change", syncGpuType));
+    syncGpuType();
   }
 
   // Custom chip add

@@ -74,6 +74,8 @@
         <p class="shell-nav-label">Setup</p>
         <a class="nav-link {% if active_page == 'import' %}is-active{% endif %}" href="{{ url_for('admin_views.admin_import_groups') }}">Import Groups</a>
         <a class="nav-link {% if active_page == 'settings' %}is-active{% endif %}" href="{{ url_for('admin_views.admin_settings') }}">Settings</a>
+        <p class="shell-nav-label">Testing</p>
+        <a class="nav-link" href="{{ url_for('student_views.student_home_page') }}">Student workspace</a>
         <div style="flex:1"></div>
         <a class="nav-link is-danger" href="/logout">Logout</a>
       </nav>

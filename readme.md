@@ -50,7 +50,8 @@ These passwords are for local/lab demos. Do not reuse in production.
 
 | Role | Username | Password | Group |
 |------|----------|----------|-------|
-| Admin | admin | plattech2026 | — |
+| Admin | admin | plattech2026 | also uses Student workspace as AdminLab |
+| Admin sandbox student | `{year}9999` | plattech2026 | AdminLab (pre-approved) |
 | Student (every year) | `{year}0001` | aidenpass | AlphaLab / NexoraTech (2024) |
 | Student | `{year}0002` | kareempass | same |
 | Student | `{year}0003` | joshuapass | same |
@@ -58,9 +59,11 @@ These passwords are for local/lab demos. Do not reuse in production.
 | Student | `{year}0005` | samanthapass | same |
 | Student | `{year}0006` | aaliyahpass | same |
 
-Examples: `20260001` / `aidenpass` (AlphaLab), `20250004` / `danielpass` (BetaLab).
+Examples: `20260001` / `aidenpass` (AlphaLab), `20250004` / `danielpass` (BetaLab), `20269999` / `plattech2026` (AdminLab).
 
-Student accounts are year-specific. Seed: **2024** full archive (10 groups + RFPs/bids); **2025** lots + 4 groups (`AlphaLab`–`DeltaLab`) with submitted RFPs, competing bids, and evaluations (winner selected per scored lot); **2026** lots + `AlphaLab`/`BetaLab` only. Platform current year is set in **Settings** (default 2026); the admin sidebar year dropdown only previews records.
+Logged-in **admin** can open **Student workspace** (sidebar) and acts as the AdminLab sandbox student for the active year — pre-approved group with lots for client/vendor testing. You can also sign in directly as `{year}9999`.
+
+Student accounts are year-specific. Seed: **2024** full archive (10 groups + RFPs/bids); **2025** lots + 4 groups (`AlphaLab`–`DeltaLab`) with submitted RFPs, competing bids, and evaluations (winner selected per scored lot); **2026** lots + `AlphaLab`/`BetaLab` + `AdminLab`. Platform current year is set in **Settings** (default 2026); the admin sidebar year dropdown only previews records.
 
 ## Admin: group size & CSV import
 

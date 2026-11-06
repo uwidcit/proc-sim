@@ -72,6 +72,10 @@
         <a class="nav-link {% if active_page == 'rfp-gallery' %}is-active{% endif %}" href="{{ url_for('student_views.rfp_gallery_page') }}">RFP Gallery</a>
         <a class="nav-link {% if active_page == 'vendor-bids' %}is-active{% endif %}" href="{{ url_for('student_views.submitted_bids_page') }}">Your Bids</a>
 
+        {% if current_user and current_user.is_admin() %}
+        <p class="shell-nav-label">Testing</p>
+        <a class="nav-link" href="{{ url_for('admin_views.admin_manage_lab_types') }}">Admin workspace</a>
+        {% endif %}
         <div style="flex:1"></div>
         <a class="nav-link is-danger" href="/logout">Logout</a>
       </nav>

@@ -96,6 +96,26 @@ def get_current_student_group(student_id, academic_year=None):
     ).first()
 
 
+def acting_student():
+    """
+    Student identity for student routes.
+    Admins act as the seeded AdminLab sandbox student for the active year.
+    """
+    from flask_jwt_extended import current_user
+    from App.models import Student
+    from App.controllers.academic_year import get_current_year
+    from App.controllers.admin_sandbox import ensure_admin_sandbox
+
+    if current_user is None:
+        return None
+    if isinstance(current_user, Student):
+        return current_user
+    if current_user.is_admin():
+        student, _ = ensure_admin_sandbox(get_current_year())
+        return student
+    return None
+
+
 def get_lot_owner_group_id(lot_id):
     from App.database import db
     from App.models import LotGroup

@@ -46,6 +46,7 @@ FEATURE_OPTIONS = (
     "Wi‑Fi 6",
     "Wi‑Fi 6E",
     "Bluetooth",
+    "Capture Card",
     "Integrated speakers",
     "Integrated webcam",
     "Fingerprint reader",
@@ -59,7 +60,8 @@ IO_OPTIONS = (
     "USB4",
     "Thunderbolt",
     "OCuLink",
-    "HDMI",
+    "HDMI in",
+    "HDMI out",
     "DisplayPort",
     "Ethernet",
     "SD card reader",
@@ -172,14 +174,9 @@ def assemble_rfp_specs(form):
     if form.get("drive_secondary"):
         drive += " + secondary storage"
 
-    vram_min = int(_num(form.get("vram_min"), 4))
-    vram_max = int(_num(form.get("vram_max"), 8))
-    if vram_min > vram_max:
-        vram_min, vram_max = vram_max, vram_min
-    if vram_min == vram_max:
-        vram_txt = f"{vram_min} GB VRAM"
-    else:
-        vram_txt = f"{vram_min}–{vram_max} GB VRAM"
+    gpu_type = (form.get("gpu_type") or "dedicated").strip().lower()
+    if gpu_type not in ("dedicated", "integrated"):
+        gpu_type = "dedicated"
 
     gpu_res_min = (form.get("gpu_res_min") or "").strip()
     gpu_res_max = (form.get("gpu_res_max") or "").strip()
@@ -199,7 +196,18 @@ def assemble_rfp_specs(form):
     else:
         res_txt = ""
 
-    gpu_parts = [vram_txt]
+    if gpu_type == "integrated":
+        gpu_parts = ["Integrated"]
+    else:
+        vram_min = int(_num(form.get("vram_min"), 4))
+        vram_max = int(_num(form.get("vram_max"), 8))
+        if vram_min > vram_max:
+            vram_min, vram_max = vram_max, vram_min
+        if vram_min == vram_max:
+            vram_txt = f"{vram_min} GB VRAM"
+        else:
+            vram_txt = f"{vram_min}–{vram_max} GB VRAM"
+        gpu_parts = [vram_txt]
     if res_txt:
         gpu_parts.append(res_txt)
     gpu = " · ".join(gpu_parts)
@@ -243,6 +251,7 @@ def parse_rfp_ui(rfp_form):
         "drive_min": 256,
         "drive_max": 512,
         "drive_secondary": False,
+        "gpu_type": "dedicated",
         "vram_min": 4,
         "vram_max": 8,
         "gpu_res_min": "",
@@ -319,6 +328,7 @@ def parse_rfp_ui(rfp_form):
     def to_gb(n, unit):
         return int(float(n) * 1024) if unit.upper().startswith("T") else int(float(n))
 
+    # Match assemble formats: "256–512 GB", "1–2 TB", "512 GB–1 TB", "1 TB"
     m = re.search(
         r'(\d+(?:\.\d+)?)\s*(GB|TB)\s*[–-]\s*(\d+(?:\.\d+)?)\s*(GB|TB)',
         drive,
@@ -328,22 +338,36 @@ def parse_rfp_ui(rfp_form):
         ui["drive_min"] = to_gb(m.group(1), m.group(2))
         ui["drive_max"] = to_gb(m.group(3), m.group(4))
     else:
-        m = re.search(r'(\d+(?:\.\d+)?)\s*(GB|TB)', drive, re.I)
+        m = re.search(
+            r'(\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)\s*(GB|TB)',
+            drive,
+            re.I,
+        )
         if m:
-            ui["drive_min"] = ui["drive_max"] = to_gb(m.group(1), m.group(2))
+            unit = m.group(3)
+            ui["drive_min"] = to_gb(m.group(1), unit)
+            ui["drive_max"] = to_gb(m.group(2), unit)
+        else:
+            m = re.search(r'(\d+(?:\.\d+)?)\s*(GB|TB)', drive, re.I)
+            if m:
+                ui["drive_min"] = ui["drive_max"] = to_gb(m.group(1), m.group(2))
 
     gpu = rfp_form.get("gpu") or ""
-    m = re.search(r'(\d+)\s*[–-]\s*(\d+)\s*GB\s*VRAM', gpu, re.I)
-    if m:
-        ui["vram_min"], ui["vram_max"] = int(m.group(1)), int(m.group(2))
+    if re.search(r"\bintegrated\b", gpu, re.I):
+        ui["gpu_type"] = "integrated"
     else:
-        m = re.search(r'(\d+)\s*GB\s*VRAM', gpu, re.I)
+        ui["gpu_type"] = "dedicated"
+        m = re.search(r'(\d+)\s*[–-]\s*(\d+)\s*GB\s*VRAM', gpu, re.I)
         if m:
-            ui["vram_min"] = ui["vram_max"] = int(m.group(1))
+            ui["vram_min"], ui["vram_max"] = int(m.group(1)), int(m.group(2))
         else:
-            m = re.search(r'(\d+)\s*[–-]\s*(\d+)\s*GB', gpu, re.I)
+            m = re.search(r'(\d+)\s*GB\s*VRAM', gpu, re.I)
             if m:
-                ui["vram_min"], ui["vram_max"] = int(m.group(1)), int(m.group(2))
+                ui["vram_min"] = ui["vram_max"] = int(m.group(1))
+            else:
+                m = re.search(r'(\d+)\s*[–-]\s*(\d+)\s*GB', gpu, re.I)
+                if m:
+                    ui["vram_min"], ui["vram_max"] = int(m.group(1)), int(m.group(2))
     found_res = [r for r in GPU_RESOLUTION_OPTIONS if r in gpu]
     if len(found_res) >= 2:
         ranked = sorted(found_res, key=_resolution_rank)
